@@ -32,19 +32,34 @@
 
 Пример: в «Доступах» сохрани `eclass_login` и `eclass_pass`, затем в чате — «зайди в e-class, выгрузи домашку на завтра и реши».
 
-## Запуск локально
+## Запуск
 
-Нужен Node.js 22.5+ (используется встроенный `node:sqlite`), Python 3 и ffmpeg.
+### Вариант 1 — одной командой (Mac / Linux)
+
+Нужен только [Node.js 22.13+](https://nodejs.org) (на Mac: `brew install node`). Для документов желателен Python 3, для роликов — ffmpeg (`brew install python ffmpeg`).
 
 ```bash
-cp .env.example .env   # впиши OPENROUTER_API_KEY и ADMIN_PASSWORD
-npm install
-npx playwright install chromium
-pip3 install pypdf python-docx python-pptx openpyxl
-npm run dev
+git clone https://github.com/AurorixAI/ALGO-OFFICE.git
+cd ALGO-OFFICE
+./start.sh
 ```
 
-## Деплой на fly.io
+Скрипт сам поставит зависимости, Chromium и Python-библиотеки, создаст `.env` с паролем от офиса, **спросит ключ OpenRouter** (взять: https://openrouter.ai/keys) и откроет офис в браузере: http://localhost:8080. Пароль он напечатает (и он лежит в `.env`, строка `ADMIN_PASSWORD`).
+
+Дальше запускать тем же `./start.sh` — повторно ничего не ставится. Ключ можно поменять в `.env` и перезапустить.
+
+### Вариант 2 — Docker (Mac / Windows / Linux)
+
+Всё нужное уже внутри образа.
+
+```bash
+cp .env.example .env      # впиши OPENROUTER_API_KEY и ADMIN_PASSWORD
+docker compose up -d --build
+```
+
+Офис: http://localhost:8080. Данные хранятся в Docker-томе `algo_data`. Остановить: `docker compose down`.
+
+### Деплой на fly.io
 
 ```bash
 fly apps create algo-office
@@ -53,7 +68,7 @@ fly secrets set OPENROUTER_API_KEY=... ADMIN_PASSWORD=... PUBLIC_URL=https://alg
 fly deploy
 ```
 
-1 ГБ RAM нужен для Chromium. Если `ADMIN_PASSWORD` не задан, пароль генерируется при каждом запуске и печатается в лог.
+1 ГБ RAM нужен для Chromium.
 
 ## Саня
 

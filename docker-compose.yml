@@ -1,0 +1,18 @@
+# Запуск в Docker: впиши ключ в .env (cp .env.example .env) и выполни  docker compose up -d --build
+services:
+  algo-office:
+    build: .
+    ports:
+      - "8080:8080"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PORT: "8080"
+      DATA_DIR: /data
+    volumes:
+      - algo_data:/data
+    restart: unless-stopped
+
+volumes:
+  algo_data:

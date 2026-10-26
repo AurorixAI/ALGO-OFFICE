@@ -3,13 +3,14 @@
 // переменных окружения с ключами у него тоже нет. Локально (macOS, не root) изоляция выключена.
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { config } from './config.js';
 
 function detect() {
   if (process.platform !== 'linux' || process.getuid?.() !== 0) return null;
   try {
-    return { uid: Number(execFileSync('id', ['-u', 'sandbox']).toString().trim()), gid: Number(execFileSync('id', ['-g', 'sandbox']).toString().trim()) };
+    return { uid: Number(execFileSync('id', ['-u', 'sandbox'], { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()), gid: Number(execFileSync('id', ['-g', 'sandbox'], { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()) };
   } catch {
     console.warn('[sandbox] пользователя sandbox нет — код агентов идёт без изоляции');
     return null;
@@ -19,10 +20,15 @@ function detect() {
 export const sandbox = detect();
 export const SANDBOX_HOME = path.join(config.workspaceDir, '.home');
 
+// Локально программы лежат где угодно (Homebrew в /opt/homebrew, nvm, …), поэтому берём PATH владельца
+// и ставим впереди .venv проекта — там Python-библиотеки для документов (их ставит start.sh)
+const VENV_BIN = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.venv', 'bin');
+const localPath = () => [fs.existsSync(VENV_BIN) && VENV_BIN, process.env.PATH].filter(Boolean).join(path.delimiter);
+
 // Чистое окружение для кода агентов: никаких токенов и ключей
 export function sandboxEnv() {
   return {
-    PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+    PATH: sandbox ? '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' : localPath(),
     HOME: SANDBOX_HOME,
     LANG: 'C.UTF-8',
     PYTHONUSERBASE: path.join(SANDBOX_HOME, '.local'),
