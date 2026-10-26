@@ -9,6 +9,18 @@ import { htmlToText } from './web.js';
 
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
 let browserPromise = null;
+
+// Агенты ходят только в интернет: file://, chrome:// и прочее открыло бы файлы сервера (db.json, secrets.json,
+// /proc/self/environ с ключами) — а агента может подтолкнуть к этому текст на чужой странице
+function webOnly(url) {
+  let u;
+  try { u = new URL(String(url)); } catch { throw new Error('Неверный адрес: нужна ссылка вида https://…'); }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error('Можно открывать только сайты (http/https)');
+  return u.href;
+}
+
+// Chromium запускается от root вместе с офисом — ключи из окружения ему не передаём
+const { OPENROUTER_API_KEY, ADMIN_PASSWORD, AGENT_LINK_TOKEN, TELEGRAM_BOT_TOKEN, ...browserEnv } = process.env;
 const pages = new Map(); // taskId -> page
 
 async function getBrowser() {
@@ -19,7 +31,7 @@ async function getBrowser() {
   }
   if (!browserPromise) {
     browserPromise = import('playwright').then(async ({ chromium }) => {
-      const b = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+      const b = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'], env: browserEnv });
       b.on('disconnected', () => { browserPromise = null; for (const id of [...pages.keys()]) pages.delete(id); });
       return b;
     });
@@ -124,6 +136,7 @@ export const browserTools = [
     description: 'Открыть URL в браузере. Возвращает текст страницы и пронумерованные элементы [id].',
     parameters: { type: 'object', properties: { url: { type: 'string' } }, required: ['url'] },
     async run({ url }, ctx) {
+      url = webOnly(url);
       const page = await getPage(ctx);
       try {
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
@@ -203,7 +216,7 @@ export const browserTools = [
       const page = await getPage(ctx);
       if (id != null) url = await el(page, id).evaluate((a) => a.href || a.getAttribute('href') || a.closest('a')?.href || '');
       if (!url) return 'Нет ссылки: укажи id ссылки или url';
-      url = new URL(url, page.url()).href;
+      url = webOnly(new URL(url, page.url()).href);
       const res = await page.context().request.get(url, { timeout: 60000 });
       if (!res.ok()) return `Не скачалось: HTTP ${res.status()}`;
       const type = res.headers()['content-type'] || '';
