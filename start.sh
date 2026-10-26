@@ -29,14 +29,24 @@ if [ -z "$(get_env ADMIN_PASSWORD)" ]; then
   ok "Пароль от офиса создан и сохранён в .env"
 fi
 
-if [ -z "$(get_env OPENROUTER_API_KEY)" ] && [ -t 0 ]; then
+if [ "$(get_env LLM_PROVIDER)" = "azure" ] || { [ -n "$(get_env AZURE_API_KEY)" ] && [ -z "$(get_env OPENROUTER_API_KEY)" ]; }; then
+  USE_AZURE=1
+  for v in AZURE_ENDPOINT AZURE_API_KEY MODEL; do
+    [ -n "$(get_env $v)" ] || warn "Azure: в .env не заполнено $v — агенты не смогут думать"
+  done
+  [ -n "$(get_env AZURE_API_KEY)" ] && ok "Модель через Azure: $(get_env MODEL)"
+else
+  USE_AZURE=""
+fi
+
+if [ -z "$USE_AZURE" ] && [ -z "$(get_env OPENROUTER_API_KEY)" ] && [ -t 0 ]; then
   echo
   say "Нужен ключ OpenRouter (https://openrouter.ai/keys). Вставь его и нажми Enter (или просто Enter, чтобы вписать позже в .env):"
   read -r key || key=""
   key=$(printf '%s' "$key" | tr -d '[:space:]')
   [ -n "$key" ] && set_env OPENROUTER_API_KEY "$key" && ok "Ключ сохранён в .env"
 fi
-[ -n "$(get_env OPENROUTER_API_KEY)" ] || warn "Ключа OpenRouter нет — офис откроется, но агенты не смогут думать. Впиши OPENROUTER_API_KEY в .env и перезапусти."
+[ -n "$USE_AZURE" ] || [ -n "$(get_env OPENROUTER_API_KEY)" ] || warn "Ключа OpenRouter нет — офис откроется, но агенты не смогут думать. Впиши OPENROUTER_API_KEY в .env и перезапусти."
 
 # ---------- зависимости Node ----------
 if [ ! -f node_modules/.package-lock.json ] || [ package-lock.json -nt node_modules/.package-lock.json ]; then

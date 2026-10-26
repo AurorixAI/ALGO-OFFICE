@@ -62,9 +62,10 @@ async function sanya() {
 
 export async function usageReport() {
   const s = store.stats;
+  const viaOpenRouter = config.llmProvider !== 'azure';
   const [or, price, sanyaUsage] = await Promise.all([
-    openrouter().catch((e) => ({ error: e.message })),
-    pricing().catch(() => null),
+    viaOpenRouter ? openrouter().catch((e) => ({ error: e.message })) : { error: 'модель работает через Azure — баланс и расходы смотри в портале Azure' },
+    viaOpenRouter ? pricing().catch(() => null) : null,
     sanya(),
   ]);
   // Смешанная цена за 1 млн токенов — по реальному соотношению вход/выход у Арслана (агенты в основном читают)
@@ -98,6 +99,7 @@ export async function usageReport() {
 // Предупреждения владельцу, когда баланс опускается ниже порогов
 const THRESHOLDS = [5, 2, 1, 0.5];
 export function watchBalance(notify) {
+  if (config.llmProvider === 'azure') return; // баланс Azure отсюда не виден
   const check = async () => {
     try {
       cache.delete('or');

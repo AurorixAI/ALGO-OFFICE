@@ -59,6 +59,19 @@ docker compose up -d --build
 
 Офис: http://localhost:8080. Данные хранятся в Docker-томе `algo_data`. Остановить: `docker compose down`.
 
+### Модель через Azure (вместо OpenRouter)
+
+Если модель (например, DeepSeek) развёрнута в Azure AI Foundry или Azure OpenAI, в `.env` вместо `OPENROUTER_API_KEY`:
+
+```
+LLM_PROVIDER=azure
+AZURE_ENDPOINT=https://<ресурс>.services.ai.azure.com/models
+AZURE_API_KEY=<ключ из портала: Keys and Endpoint>
+MODEL=<имя деплоя модели>
+```
+
+В `AZURE_ENDPOINT` можно вставить и полный Target URI со страницы деплоя — версия API подставится сама. Модели должны уметь вызывать инструменты (tool calling). Если модель не видит картинки, прикреплённые фото ей не передаются, агент работает по именам файлов. Баланс во вкладке «Бюджет» в этом режиме не показывается — расходы смотри в портале Azure.
+
 ### Деплой на fly.io
 
 ```bash
