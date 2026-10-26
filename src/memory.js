@@ -26,7 +26,6 @@ export function scrubAll() {
 
 // ---------- журнал задач и поиск: SQLite + FTS5 (memdb.js) ----------
 export function addJournal(task) {
-  if (task.agent !== 'mirik' && task.source !== 'telegram') return;
   memdb.addJournal({ ...task, text: scrub(task.text), result: scrub(task.result || '') });
 }
 

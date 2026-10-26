@@ -8,7 +8,6 @@ fs.mkdirSync(config.workspaceDir, { recursive: true });
 
 const defaults = {
   tasks: [],      // { id, text, agent, status, source, chatId, createdAt, finishedAt, result, steps[] }
-  owners: [],     // telegram user id
   stats: { tokens: 0, cost: 0, tasksDone: 0 },
 };
 

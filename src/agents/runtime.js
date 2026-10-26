@@ -1,4 +1,6 @@
 // Цикл работы агентов: думаем -> вызываем инструменты -> отчитываемся. Мирик делегирует подчинённым.
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { chat } from '../llm.js';
 import { config } from '../config.js';
 import { AGENTS, AGENT_LIST } from './registry.js';
@@ -6,7 +8,7 @@ import { bus, log } from '../bus.js';
 import { store, save } from '../store.js';
 import * as memdb from '../memdb.js';
 import { webTools } from '../tools/web.js';
-import { fileTools } from '../tools/files.js';
+import { fileTools, wsPath } from '../tools/files.js';
 import { browserTools, closeTaskPage } from '../tools/browser.js';
 import { docTools } from '../tools/docs.js';
 import { videoTools } from '../tools/video.js';
@@ -48,6 +50,7 @@ export function createTask({ text, agent = 'mirik', source = 'panel', chatId = n
     chatId,
     createdAt: Date.now(),
     steps: [],
+    attachments: [], // файлы, скриншоты и сообщения о ходе работы — показываются в чате офиса
     result: null,
   };
   store.tasks.push(task);
@@ -61,6 +64,33 @@ function taskStep(task, agent, text) {
   task.steps.push({ t: Date.now(), agent, text: scrub(text).slice(0, 300) });
   if (task.steps.length > 120) task.steps.shift();
   bus.emit('event', { type: 'task', task });
+}
+
+// ---------- вложения: всё, что агенты «отправляют владельцу», попадает в чат офиса ----------
+const KIND = { '.png': 'image', '.jpg': 'image', '.jpeg': 'image', '.webp': 'image', '.gif': 'image', '.mp4': 'video', '.mov': 'video', '.m4v': 'video', '.webm': 'video', '.mp3': 'audio', '.m4a': 'audio', '.ogg': 'audio', '.wav': 'audio' };
+
+function attach(task, item) {
+  (task.attachments ||= []).push({ t: Date.now(), ...item });
+  if (task.attachments.length > 60) task.attachments.shift();
+  save();
+  bus.emit('event', { type: 'task', task });
+}
+
+function taskIO(task) {
+  return {
+    notify: async (text) => attach(task, { kind: 'note', text: scrub(text).slice(0, 4000) }),
+    sendFile: async (full, caption) => {
+      const { size } = await fs.stat(full);
+      const rel = path.relative(wsPath(), full);
+      attach(task, { kind: KIND[path.extname(full).toLowerCase()] || 'file', path: rel, name: path.basename(full), size, caption: caption && scrub(caption).slice(0, 1000) });
+    },
+    sendPhoto: async (buf, caption) => {
+      const rel = `screenshots/${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}_${Math.random().toString(36).slice(2, 6)}.jpg`;
+      await fs.mkdir(path.dirname(wsPath(rel)), { recursive: true });
+      await fs.writeFile(wsPath(rel), buf);
+      attach(task, { kind: 'image', path: rel, name: path.basename(rel), size: buf.length, caption: caption && scrub(caption).slice(0, 1000) });
+    },
+  };
 }
 
 export function cancelTask(id) {
@@ -170,7 +200,7 @@ const builtinTools = [
         signal: AbortSignal.timeout(90_000),
       });
       const data = await res.json().catch(() => ({}));
-      if (data.pending) return 'Саня ещё работает — результат он пришлёт владельцу в Telegram сам.';
+      if (data.pending) return 'Саня ещё работает — результат он пришлёт владельцу сам.';
       return data.reply ? `Ответ Сани:\n${data.reply}` : `Ошибка связи с Саней: ${data.error || 'HTTP ' + res.status}`;
     },
   },
@@ -323,7 +353,7 @@ export async function runAgent({ agentId, input, history = [], ctx }) {
 }
 
 // Главная точка входа: задание для Мирика (или конкретного агента).
-// io: { notify(text), sendFile(path, caption), sendPhoto(buf, caption) }
+// Уведомления, файлы и скриншоты агентов прикрепляются к задаче и видны в чате офиса.
 export async function runTask(task, io = {}, { input, history = [] } = {}) {
   const control = { cancelled: false };
   running.set(task.id, control);
@@ -335,7 +365,7 @@ export async function runTask(task, io = {}, { input, history = [] } = {}) {
       agentId: task.agent,
       input: input ?? task.text,
       history,
-      ctx: { task, taskId: task.id, depth: 0, control, ...io },
+      ctx: { task, taskId: task.id, depth: 0, control, ...taskIO(task), ...io },
     });
     task.status = 'done';
     task.result = scrub(result);
@@ -357,7 +387,7 @@ export async function runTask(task, io = {}, { input, history = [] } = {}) {
 }
 
 // Диалог с Мириком в чате с памятью разговора.
-export async function talkToMirik(chatId, { text, content, source = 'telegram', onTask }, io) {
+export async function talkToMirik(chatId, { text, content, source = 'panel', onTask }, io = {}) {
   const task = createTask({ text, agent: 'mirik', source, chatId });
   onTask?.(task);
   const window = memdb.history(chatId, 20);

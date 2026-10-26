@@ -1,13 +1,13 @@
 import path from 'node:path';
+import crypto from 'node:crypto';
 
 const env = process.env;
 
 export const config = {
   openrouterKey: env.OPENROUTER_API_KEY || '',
   model: env.MODEL || 'z-ai/glm-5.3-flash',
-  botToken: env.TELEGRAM_BOT_TOKEN || '',
-  ownerIds: (env.OWNER_IDS || '').split(',').map((s) => s.trim()).filter(Boolean).map(Number),
-  adminPassword: env.ADMIN_PASSWORD || 'mirik',
+  // без ADMIN_PASSWORD пароль генерируется при каждом запуске и печатается в лог
+  adminPassword: env.ADMIN_PASSWORD || crypto.randomBytes(9).toString('base64url'),
   publicUrl: (env.PUBLIC_URL || `http://localhost:${env.PORT || 8080}`).replace(/\/$/, ''),
   port: Number(env.PORT || 8080),
   dataDir: path.resolve(env.DATA_DIR || './data'),
@@ -18,4 +18,5 @@ export const config = {
 
 config.workspaceDir = path.join(config.dataDir, 'workspace');
 
+if (!env.ADMIN_PASSWORD) console.warn(`[config] ADMIN_PASSWORD не задан — пароль от офиса на этот запуск: ${config.adminPassword}`);
 if (!config.openrouterKey) console.warn('[config] OPENROUTER_API_KEY не задан — агенты не смогут думать');

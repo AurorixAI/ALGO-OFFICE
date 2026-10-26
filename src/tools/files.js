@@ -89,7 +89,7 @@ export const fileTools = [
   },
   {
     name: 'send_file',
-    description: 'Отправить файл из рабочей папки пользователю в Telegram.',
+    description: 'Отправить файл из рабочей папки владельцу в чат офиса (картинки и видео покажутся прямо в чате).',
     parameters: { type: 'object', properties: { path: { type: 'string' }, caption: { type: 'string' } }, required: ['path'] },
     async run({ path: p, caption }, ctx) {
       const full = wsPath(p);

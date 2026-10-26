@@ -2,14 +2,11 @@ import { Office, avatarURL } from './office.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-const tg = window.Telegram?.WebApp;
-tg?.ready();
-tg?.expand();
 
 const AGENT_STATUS = { idle: 'свободен', thinking: 'думает', working: 'работает', managing: 'раздаёт задачи', paused: 'на паузе' };
 const ACTIVE = new Set(['running', 'queued', 'paused']);
 const TASK_STATUS = { running: ['в работе', 'working'], queued: ['в очереди', 'thinking'], paused: ['на паузе', 'paused'], done: ['готово', 'done'], failed: ['ошибка', 'failed'], cancelled: ['отменено', 'cancelled'], interrupted: ['прервано', 'failed'] };
-const state = { agents: {}, departments: {}, tasks: new Map(), openSteps: new Set(), to: 'mirik', stats: null };
+const state = { agents: {}, departments: {}, tasks: new Map(), openSteps: new Set(), to: 'mirik', stats: null, attach: [] };
 const coarse = matchMedia('(pointer: coarse)').matches;
 let token = null;
 try { token = localStorage.getItem('mirik_token'); } catch {}
@@ -55,6 +52,14 @@ async function api(path, body) {
   if (res.status === 401) { showLogin(); throw new Error('auth'); }
   return res.json();
 }
+
+// Текст задания без служебной приписки о прикреплённых файлах
+const FILES_NOTE = /\n*\[Владелец прикрепил файлы: [^\]]*\]$/;
+const taskText = (t) => (t.files?.length ? t.text.replace(FILES_NOTE, '') || '📎 ' + t.files.map((f) => f.split('/').pop()).join(', ') : t.text);
+
+// Ссылка на файл рабочей папки (картинки и видео в чате, скачивание)
+const fileURL = (p, download) => `/api/files?path=${encodeURIComponent(p)}&t=${encodeURIComponent(token || '')}${download ? '&download=1' : ''}`;
+const fmtSize = (n) => (n == null ? '' : n >= 1048576 ? (n / 1048576).toFixed(1) + ' МБ' : Math.max(1, Math.round(n / 1024)) + ' КБ');
 
 async function login(payload) {
   const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -117,7 +122,7 @@ function handle(e) {
       const prev = state.tasks.get(e.task.id);
       state.tasks.set(e.task.id, e.task);
       if (prev?.status === 'running' && e.task.status === 'done') {
-        toast(`✅ ${state.agents[e.task.agent]?.name}: «${e.task.text.slice(0, 60)}» — готово`);
+        toast(`✅ ${state.agents[e.task.agent]?.name}: «${taskText(e.task).slice(0, 60)}» — готово`);
         office.taskDone(e.task.agent);
         if (state.stats) state.stats.tasksDone++;
       }
@@ -129,7 +134,10 @@ function handle(e) {
     case 'delegate': office.delegate(e.from, e.to, e.text); break;
     case 'render': office.setRender(e); break;
     case 'report': office.report(e.from); break;
-    case 'log': addLog(e.entry); break;
+    case 'log':
+      addLog(e.entry);
+      if (e.entry.kind === 'alert') toast(e.entry.text);
+      break;
   }
 }
 
@@ -197,7 +205,7 @@ function showCard(id) {
       <div class="card-mini"><span class="status ${a.state.status}">${AGENT_STATUS[a.state.status] || a.state.status}</span> ${/^(думает|отдыхает)/.test(a.state.activity) ? '' : esc(a.state.activity)}</div></div></div>
     <div class="now"><span class="status ${a.state.status}">${AGENT_STATUS[a.state.status] || a.state.status}</span>
       <div style="margin-top:6px">${esc(a.state.activity)}</div>
-      ${task ? `<small>Задание: ${esc(task.text.slice(0, 90))}</small>` : ''}</div>
+      ${task ? `<small>Задание: ${esc(taskText(task).slice(0, 90))}</small>` : ''}</div>
     <div class="actions">
       <button class="btn primary" data-assign="${a.id}">✍️ <span>Поручить</span></button>
       <button class="btn ghost" data-follow="${a.id}">🎯 <span>${following ? 'Следим' : 'Следить'}</span></button>
@@ -219,10 +227,24 @@ function stepLine(s) {
   return `<li>${a?.emoji || '•'} <b>${esc(a?.name || s.agent)}</b> ${esc(plain(s.text).slice(0, 220))}</li>`;
 }
 
+
+function attachmentHTML(x) {
+  if (x.kind === 'note') return `<div class="att-note">📣 ${esc(x.text)}</div>`;
+  const cap = x.caption ? `<div class="att-cap">${esc(x.caption)}</div>` : '';
+  const chip = `<a class="chip" href="${fileURL(x.path, true)}" download="${esc(x.name)}">📄 <span>${esc(x.name)}</span><small>${fmtSize(x.size)}</small></a>`;
+  if (x.kind === 'image') return `<div class="att"><a href="${fileURL(x.path)}" target="_blank" rel="noopener"><img class="att-media" src="${fileURL(x.path)}" alt="${esc(x.name)}" loading="lazy"></a>${cap}</div>`;
+  if (x.kind === 'video') return `<div class="att"><video class="att-media" src="${fileURL(x.path)}" controls preload="metadata" playsinline></video>${cap}<div style="margin-top:6px">${chip}</div></div>`;
+  if (x.kind === 'audio') return `<div class="att"><audio src="${fileURL(x.path)}" controls preload="metadata"></audio>${cap}</div>`;
+  return `<div class="att">${chip}${cap}</div>`;
+}
+
 function messageHTML(t) {
   const a = state.agents[t.agent] || {};
   const time = new Date(t.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-  const src = t.source === 'telegram' ? '✈️ Telegram' : '🏢 Офис';
+  const src = { telegram: '✈️ Telegram', sanya: '🤝 Саня' }[t.source] || '🏢 Офис';
+  const userText = t.files?.length ? t.text.replace(FILES_NOTE, '') : t.text;
+  const userFiles = t.files?.length ? `<div class="files">${t.files.map((f) => `<a class="chip" href="${fileURL(f, true)}">📎 <span>${esc(f.split('/').pop())}</span></a>`).join('')}</div>` : '';
+  const atts = t.attachments?.length ? `<div class="atts">${t.attachments.map(attachmentHTML).join('')}</div>` : '';
   const to = t.agent !== 'mirik' ? `<span>→ ${esc(a.name)}</span>` : '';
   const running = ACTIVE.has(t.status);
   const last = t.steps.at(-1);
@@ -237,9 +259,9 @@ function messageHTML(t) {
   const [stLabel, stCls] = TASK_STATUS[t.status] || ['', ''];
   const status = t.status !== 'done' && stLabel ? `<span class="status ${stCls}">${stLabel}</span>` : '';
   const actions = `<div class="bubble-actions">${taskButtons(t, false)}</div>`;
-  return `<div class="msg me"><div><div class="bubble">${esc(t.text)}</div><div class="meta"><span>${src}</span>${to}<span>${time}</span></div></div></div>
+  return `<div class="msg me"><div>${userText ? `<div class="bubble">${esc(userText)}</div>` : ''}${userFiles}<div class="meta"><span>${src}</span>${to}<span>${time}</span></div></div></div>
     <div class="msg bot"><img class="ava" src="${avatarURL(a.id, a.look)}" alt="">
-      <div class="bubble ${t.status === 'failed' ? 'failed' : ''}"><div class="who">${esc(a.name)} ${status}</div>${body}${steps}${actions}</div></div>`;
+      <div class="bubble ${t.status === 'failed' ? 'failed' : ''}"><div class="who">${esc(a.name)} ${status}</div>${body}${atts}${steps}${actions}</div></div>`;
 }
 
 // Кнопки управления задачей — одинаковые в чате и во всплывающем окне
@@ -256,7 +278,7 @@ async function taskAction(act, id, btn) {
   const t = state.tasks.get(id);
   if (!t) return;
   if (act === 'copy') { await navigator.clipboard?.writeText(t.result || ''); toast('Скопировано'); return; }
-  if (act === 'retry') { closePopup(); switchTab('chat'); await send(t.text, t.agent); return; }
+  if (act === 'retry') { closePopup(); switchTab('chat'); await send(t.files?.length ? t.text.replace(FILES_NOTE, '') : t.text, t.agent, t.files); return; }
   if (act === 'open') { closePopup(); openInChat(id); return; }
   if (btn) btn.disabled = true;
   const r = await api(`/api/tasks/${id}/${act}`, {});
@@ -289,7 +311,7 @@ function popItem(t) {
     ? (last ? `${state.agents[last.agent]?.emoji || '•'} ${esc(plain(last.text).slice(0, 140))}` : 'ждёт начала')
     : esc(plain(t.result || '—').slice(0, 160));
   return `<div class="pitem ${t.status}">
-    <div class="pitem-top"><img src="${avatarURL(a.id, a.look)}" alt=""><div class="pitem-text">${esc(t.text.slice(0, 140))}</div><span class="status ${stCls}">${stLabel}</span></div>
+    <div class="pitem-top"><img src="${avatarURL(a.id, a.look)}" alt=""><div class="pitem-text">${esc(taskText(t).slice(0, 140))}</div><span class="status ${stCls}">${stLabel}</span></div>
     <div class="pitem-meta"><span>${time}</span>${who.length ? `<span class="who-row">${who.map((w) => `<img title="${esc(w.name)}" src="${avatarURL(w.id, w.look)}" alt="">`).join('')}</span>` : ''}</div>
     <div class="pitem-detail">${detail}</div>
     <div class="bubble-actions">${taskButtons(t, true)}</div>
@@ -420,7 +442,8 @@ function switchTab(tab) {
   document.querySelectorAll('.view').forEach((v) => v.classList.toggle('hidden', v.id !== 'v-' + tab));
   if (tab === 'feed') $('#feedDot').classList.add('hidden');
   if (tab === 'budget') loadUsage();
-  $('#composer').classList.toggle('hidden', tab === 'feed' || tab === 'budget');
+  if (tab === 'settings') loadSettings();
+  $('#composer').classList.toggle('hidden', tab === 'feed' || tab === 'budget' || tab === 'settings');
 }
 document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => switchTab(b.dataset.tab)));
 
@@ -444,19 +467,120 @@ $('#msg').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey || (!coarse && !e.shiftKey))) { e.preventDefault(); $('#composer').requestSubmit(); }
 });
 
-async function send(text, agent) {
-  const r = await api('/api/tasks', { text, agent });
-  if (r.error) return toast(r.error, true);
-  if (r.task) { state.tasks.set(r.task.id, r.task); upsertMessage(r.task); scrollChat(true); }
-  tg?.HapticFeedback?.impactOccurred('light');
+async function send(text, agent, files) {
+  const r = await api('/api/tasks', { text, agent, files });
+  if (r.error) { toast(r.error, true); return false; }
+  // WebSocket мог уже прислать более свежее состояние этой задачи — не затираем его ответом POST
+  if (r.task && !state.tasks.has(r.task.id)) { state.tasks.set(r.task.id, r.task); upsertMessage(r.task); }
+  scrollChat(true);
+  return true;
 }
 $('#composer').addEventListener('submit', async (e) => {
   e.preventDefault();
   const text = $('#msg').value.trim();
-  if (!text) return;
+  if (state.attach.some((x) => !x.path)) return toast('Подожди, файл ещё загружается');
+  const files = state.attach.map((x) => x.path);
+  if (!text && !files.length) return;
   $('#msg').value = '';
   autosize();
-  await send(text, state.to);
+  const prev = state.attach;
+  state.attach = [];
+  renderAttach();
+  if (!(await send(text, state.to, files))) { state.attach = prev; renderAttach(); }
+});
+
+// ---------- вложения: скрепка, вставка из буфера, перетаскивание ----------
+function renderAttach() {
+  const el = $('#attachList');
+  el.classList.toggle('hidden', !state.attach.length);
+  el.innerHTML = state.attach.map((x, i) => `<span class="chip ${x.path ? '' : 'loading'}">${x.path ? '📎' : '⏳'} <span>${esc(x.name)}</span><small>${fmtSize(x.size)}</small><button type="button" data-unattach="${i}" aria-label="Убрать">✕</button></span>`).join('');
+}
+async function upload(file) {
+  if (file.size > 50 * 1048576) return toast(`${file.name}: больше 50 МБ`, true);
+  const item = { name: file.name || 'file', size: file.size, path: null };
+  state.attach.push(item);
+  renderAttach();
+  try {
+    const res = await fetch('/api/upload', { method: 'POST', headers: { 'x-token': token || '', 'x-filename': encodeURIComponent(item.name), 'Content-Type': 'application/octet-stream' }, body: file });
+    if (res.status === 401) { showLogin(); throw new Error('нужно войти'); }
+    const r = await res.json();
+    if (r.error) throw new Error(r.error);
+    Object.assign(item, r);
+  } catch (err) {
+    state.attach = state.attach.filter((x) => x !== item);
+    toast(`Не загрузился ${item.name}: ${err.message}`, true);
+  }
+  renderAttach();
+}
+$('#clip').addEventListener('click', () => $('#fileInput').click());
+$('#fileInput').addEventListener('change', (e) => { [...e.target.files].forEach(upload); e.target.value = ''; });
+$('#attachList').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-unattach]');
+  if (b) { state.attach.splice(Number(b.dataset.unattach), 1); renderAttach(); }
+});
+$('#msg').addEventListener('paste', (e) => {
+  const files = [...(e.clipboardData?.files || [])];
+  if (!files.length) return;
+  e.preventDefault();
+  files.forEach((f, i) => upload(f.name && f.name !== 'image.png' ? f : new File([f], `screenshot_${Date.now()}_${i}.${(f.type.split('/')[1] || 'png').replace('jpeg', 'jpg')}`, { type: f.type })));
+});
+const composer = $('#composer');
+composer.addEventListener('dragover', (e) => { if (e.dataTransfer?.types.includes('Files')) { e.preventDefault(); composer.classList.add('drop'); } });
+composer.addEventListener('dragleave', () => composer.classList.remove('drop'));
+composer.addEventListener('drop', (e) => {
+  composer.classList.remove('drop');
+  if (!e.dataTransfer?.files.length) return;
+  e.preventDefault();
+  [...e.dataTransfer.files].forEach(upload);
+});
+
+// ---------- доступы и память ----------
+async function loadSettings() {
+  try {
+    const [sec, mem] = await Promise.all([api('/api/secrets'), api('/api/memory')]);
+    renderSettings(sec.names, mem.facts);
+  } catch (e) {
+    if (e.message !== 'auth') $('#v-settings').innerHTML = `<div class="empty">Не удалось загрузить: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderSettings(names, facts) {
+  $('#v-settings').innerHTML = `
+    <section class="bcard"><h4>🔐 Доступы для сайтов</h4>
+      <form class="set-form" id="secretForm" autocomplete="off">
+        <input name="name" placeholder="Имя, напр. eclass_login" autocapitalize="off" spellcheck="false" required>
+        <input name="value" type="password" placeholder="Значение" autocomplete="new-password" required>
+        <button class="btn primary" type="submit">Сохранить</button>
+      </form>
+      <div class="set-list">${names.length ? names.map((n) => `<div class="set-item"><span><code>${esc(n)}</code></span><button data-delsecret="${esc(n)}">Удалить</button></div>`).join('') : '<div class="note">Пока пусто.</div>'}</div>
+      <div class="note">Боря вводит эти логины и пароли в формы на сайтах по имени, но самих значений не видит. Обратно значения не показываются. Для e-class нужны <code>eclass_login</code> и <code>eclass_pass</code>.</div>
+    </section>
+    <section class="bcard"><h4>🧠 Что Мирик помнит о тебе · ${facts.length}</h4>
+      <div class="set-list">${facts.length ? facts.map((f) => `<div class="set-item"><span>${esc(f.text)}</span><button data-forget="${f.id}">Забыть</button></div>`).join('') : '<div class="note">Память пуста.</div>'}</div>
+      ${facts.length ? '<div class="bubble-actions"><button class="stop" data-forgetall>Стереть всё</button></div>' : ''}
+    </section>
+    <section class="bcard"><h4>💬 Диалог</h4>
+      <div class="note" style="margin:0 0 10px">Новый диалог: Мирик забудет текущую переписку в чате. Долгая память и история задач останутся.</div>
+      <button class="btn ghost" data-resetchat>🧹 Начать диалог заново</button>
+    </section>`;
+}
+
+$('#v-settings').addEventListener('submit', async (e) => {
+  if (e.target.id !== 'secretForm') return;
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const r = await api('/api/secrets', { name: f.get('name').trim(), value: f.get('value') });
+  if (r.error) return toast(r.error, true);
+  toast(`🔐 Доступ «${f.get('name').trim()}» сохранён`);
+  loadSettings();
+});
+$('#v-settings').addEventListener('click', async (e) => {
+  const ds = e.target.closest('[data-delsecret]');
+  if (ds && confirm(`Удалить доступ «${ds.dataset.delsecret}»?`)) { await api(`/api/secrets/${encodeURIComponent(ds.dataset.delsecret)}/delete`, {}); loadSettings(); }
+  const fg = e.target.closest('[data-forget]');
+  if (fg) { await api(`/api/memory/${fg.dataset.forget}/delete`, {}); loadSettings(); }
+  if (e.target.closest('[data-forgetall]') && confirm('Стереть всю долгую память Мирика?')) { await api('/api/memory/clear', {}); loadSettings(); }
+  if (e.target.closest('[data-resetchat]') && confirm('Начать диалог с Мириком заново?')) { await api('/api/chat/reset', {}); toast('🧹 Диалог начат заново'); }
 });
 
 // ---------- бюджет ----------
@@ -627,9 +751,6 @@ setInterval(async () => {
 
 // ---------- старт ----------
 (async () => {
-  if (tg?.initData) {
-    try { await login({ initData: tg.initData }); } catch {}
-  }
   if (!token) return showLogin();
   connect();
   loadUsage();

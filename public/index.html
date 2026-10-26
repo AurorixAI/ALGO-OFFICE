@@ -9,7 +9,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Unbounded:wght@600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
   <div id="login" class="login hidden">
@@ -57,16 +56,23 @@
           <button data-tab="team">👥 Команда</button>
           <button data-tab="feed">📡 Лента <span class="badge-dot hidden" id="feedDot"></span></button>
           <button data-tab="budget">💰 Бюджет</button>
+          <button data-tab="settings">⚙️ Доступы</button>
         </nav>
         <div class="views">
           <div class="view" id="v-chat"><div class="chat" id="chat"></div><button class="jump hidden" id="jump">↓ Новые</button></div>
           <div class="view hidden" id="v-team"></div>
           <div class="view hidden" id="v-feed"></div>
           <div class="view hidden" id="v-budget"><div class="empty">Загружаю…</div></div>
+          <div class="view hidden" id="v-settings"><div class="empty">Загружаю…</div></div>
         </div>
         <form class="composer" id="composer">
           <div class="to" id="to"></div>
+          <div class="attach-list hidden" id="attachList"></div>
           <div class="row">
+            <button class="clip" type="button" id="clip" title="Прикрепить файл" aria-label="Прикрепить файл">
+              <svg viewBox="0 0 24 24" width="20" height="20"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="m20 11.5-8.4 8.4a5 5 0 0 1-7.1-7.1l8.8-8.8a3.3 3.3 0 0 1 4.7 4.7l-8.8 8.8a1.7 1.7 0 0 1-2.4-2.4l8-8"/></svg>
+            </button>
+            <input type="file" id="fileInput" multiple hidden />
             <textarea id="msg" rows="1" placeholder="Задание для Мирика…" enterkeyhint="send"></textarea>
             <button class="send" type="submit" title="Отправить" aria-label="Отправить">
               <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M3.4 20.4 21 12 3.4 3.6 3.4 10l12.6 2-12.6 2z"/></svg>

@@ -177,6 +177,36 @@ button { cursor: pointer; }
 .row textarea:focus { border-color: var(--gold); }
 .send { width: 46px; height: 46px; flex: none; border: 0; border-radius: 14px; background: var(--gold); color: var(--gold-ink); display: grid; place-items: center; }
 .send:disabled { opacity: .5; }
+.clip { width: 46px; height: 46px; flex: none; border: 1px solid var(--line); border-radius: 14px; background: var(--panel-2); color: var(--muted); display: grid; place-items: center; }
+.clip:hover { color: var(--text); border-color: var(--muted); }
+.composer.drop .row textarea { border-color: var(--gold); border-style: dashed; }
+.attach-list { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; border: 1px solid var(--line); background: var(--panel-2); border-radius: 10px; padding: 4px 8px; font-size: 12.5px; color: var(--text); text-decoration: none; }
+.chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.chip small { color: var(--muted); flex: none; }
+.chip button { border: 0; background: none; color: var(--muted); padding: 0 2px; }
+.chip.loading { opacity: .6; }
+.msg.me .files { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; margin-top: 6px; }
+
+/* ---------- вложения в ответах ---------- */
+.atts { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.att-note { font-size: 13px; color: #d9d3ec; background: rgba(255,210,63,.07); border-left: 2px solid var(--gold); border-radius: 0 8px 8px 0; padding: 6px 10px; white-space: pre-wrap; }
+.att-media { display: block; max-width: 100%; max-height: 420px; border-radius: 10px; border: 1px solid var(--line); background: #0f0d16; }
+.att-cap { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.att audio { width: 100%; }
+
+/* ---------- доступы и память ---------- */
+.set-form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; }
+.set-form input { min-width: 0; background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; outline: none; }
+.set-form input:focus { border-color: var(--gold); }
+.set-form .btn { padding: 9px 12px; }
+.set-list { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+.set-item { display: flex; align-items: center; gap: 8px; padding: 6px 2px; border-bottom: 1px solid rgba(255,255,255,.04); font-size: 13px; }
+.set-item span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.set-item code { font: 12.5px var(--mono); }
+.set-item button { border: 1px solid var(--line); background: transparent; border-radius: 8px; padding: 2px 8px; font-size: 12px; color: var(--muted); flex: none; }
+.set-item button:hover { color: var(--red); border-color: rgba(255,107,107,.4); }
+@media (max-width: 520px) { .set-form { grid-template-columns: 1fr; } }
 
 /* вход */
 .login { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: radial-gradient(ellipse at top, #2c2445, #0f0d16); padding: 16px; }

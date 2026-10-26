@@ -1,4 +1,4 @@
-// Шина событий: агенты -> офис (WebSocket) и Telegram.
+// Шина событий: агенты -> офис (WebSocket).
 import { EventEmitter } from 'node:events';
 
 export const bus = new EventEmitter();

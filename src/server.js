@@ -1,35 +1,26 @@
-// HTTP + WebSocket для игрового офиса.
+// HTTP + WebSocket для игрового офиса. Это единственный интерфейс: чат, задания, файлы, доступы, память.
 import http from 'node:http';
 import crypto from 'node:crypto';
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import express from 'express';
 import { WebSocketServer } from 'ws';
-import { InputFile } from 'grammy';
 import { config } from './config.js';
-import { store, save } from './store.js';
-import { bus, recentLogs } from './bus.js';
+import { store } from './store.js';
+import { bus, log, recentLogs } from './bus.js';
+import * as memdb from './memdb.js';
 import { AGENT_LIST, DEPARTMENTS } from './agents/registry.js';
 import { agentState, createTask, runTask, cancelTask, pauseTask, resumeTask, talkToMirik } from './agents/runtime.js';
-import { bot, ownerChats, homeChat, sendMedia } from './bot.js';
+import { wsPath } from './tools/files.js';
 import { usageReport, watchBalance } from './billing.js';
-import { setSecret } from './secrets.js';
+import { setSecret, deleteSecret, secretNames } from './secrets.js';
 
-const SESSION = crypto.createHash('sha256').update('mirik:' + config.adminPassword + ':' + config.botToken).digest('hex');
+const SESSION = crypto.createHash('sha256').update('mirik:' + config.adminPassword).digest('hex');
 const authed = (token) => typeof token === 'string' && token.length === SESSION.length && crypto.timingSafeEqual(Buffer.from(token), Buffer.from(SESSION));
 
-// Проверка initData из Telegram Mini App
-function checkTelegram(initData) {
-  if (!config.botToken || !initData) return false;
-  const params = new URLSearchParams(initData);
-  const hash = params.get('hash');
-  params.delete('hash');
-  const dataCheck = [...params.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join('\n');
-  const secret = crypto.createHmac('sha256', 'WebAppData').update(config.botToken).digest();
-  const calc = crypto.createHmac('sha256', secret).update(dataCheck).digest('hex');
-  if (calc !== hash) return false;
-  const user = JSON.parse(params.get('user') || '{}');
-  return ownerChats().includes(user.id);
-}
+const PANEL_CHAT = 'panel'; // память диалога веб-чата
+const IMAGE = /\.(png|jpe?g|webp|gif)$/i;
+const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' };
 
 const publicTask = (t) => ({ ...t, steps: t.steps.slice(-40) });
 
@@ -44,28 +35,32 @@ function snapshot() {
   };
 }
 
-// Задачи из офиса: файлы/скриншоты/уведомления уходят владельцу в Telegram
-function ownerIO(target) {
-  const chatId = target || homeChat();
-  if (!bot || !chatId) return {};
-  return {
-    notify: (text) => bot.api.sendMessage(chatId, '📣 ' + text).catch(() => {}),
-    sendFile: (full, caption) => sendMedia(bot.api, chatId, full, caption),
-    sendPhoto: (buf, caption) => bot.api.sendPhoto(chatId, new InputFile(buf, 'screen.jpg'), { caption }),
-  };
+// Прикреплённые файлы: текст для модели + картинки, которые модель увидит сама
+async function withFiles(text, files) {
+  const list = (Array.isArray(files) ? files : []).map(String).filter(Boolean).slice(0, 10);
+  for (const f of list) await fs.access(wsPath(f));
+  if (!list.length) return { text };
+  const full = `${text || 'Посмотри, что в файлах, и скажи, что с ними сделать.'}\n\n[Владелец прикрепил файлы: ${list.join(', ')}]`;
+  const images = list.filter((f) => IMAGE.test(f)).slice(0, 4);
+  if (!images.length) return { text: full, files: list };
+  const parts = [{ type: 'text', text: full }];
+  for (const f of images) {
+    const b64 = (await fs.readFile(wsPath(f))).toString('base64');
+    parts.push({ type: 'image_url', image_url: { url: `data:${MIME[f.split('.').pop().toLowerCase()]};base64,${b64}` } });
+  }
+  return { text: full, files: list, content: parts };
 }
 
 export function startServer() {
   const app = express();
   app.use(express.json({ limit: '1mb' }));
-  // no-cache: браузер и Telegram каждый раз сверяются с сервером, и обновления интерфейса видны сразу
+  // no-cache: браузер каждый раз сверяется с сервером, и обновления интерфейса видны сразу
   app.use(express.static(path.resolve('public'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
 
   app.get('/health', (_, res) => res.send('ok'));
 
   app.post('/api/login', (req, res) => {
-    const { password, initData } = req.body || {};
-    if (password === config.adminPassword || checkTelegram(initData)) return res.json({ token: SESSION });
+    if (req.body?.password === config.adminPassword) return res.json({ token: SESSION });
     res.status(401).json({ error: 'Неверный пароль' });
   });
 
@@ -85,55 +80,98 @@ export function startServer() {
     if (!names.length) return res.status(400).json({ error: 'нет секретов' });
     for (const k of names) setSecret(k, secrets[k]);
     const from = String(req.body?.from || 'Саня').slice(0, 40);
-    ownerIO(ownerChats()[0]).notify?.(`🔐 ${from} передал доступ: ${names.join(', ')}. Боря сможет заходить на сайт сам.`);
+    log('mirik', `🔐 ${from} передал доступ: ${names.join(', ')}. Боря сможет заходить на сайт сам.`, 'alert');
     res.json({ ok: true, saved: names });
   });
 
-  // Саня присылает задания Мирику
+  // Саня присылает задания Мирику — они видны в чате офиса как обычные задачи
   app.post('/link/ask', async (req, res) => {
     if (!linkAuthed(req)) return res.status(401).json({ error: 'auth' });
     const text = String(req.body?.text || '').trim();
     const from = String(req.body?.from || 'Саня').slice(0, 40);
     if (!text) return res.status(400).json({ error: 'Пустое задание' });
-    // Саня говорит, из какого чата пришла просьба: туда и отвечаем (в группу — значит в группу)
-    const target = Number.isInteger(req.body?.chat_id) ? req.body.chat_id : undefined;
-    const io = ownerIO(target);
-    const job = talkToMirik('sanya', { text: `[${from}]: ${text}`, source: 'sanya' }, { ...io, fromSanya: true });
-    // держим запрос до 50 с; дольше — Мирик доделает и отчитается владельцу в Telegram сам
+    const job = talkToMirik('sanya', { text: `[${from}]: ${text}`, source: 'sanya' }, { fromSanya: true });
+    // держим запрос до 50 с; дольше — Мирик доделает, а результат будет в чате офиса
     const late = Symbol('late');
     try {
       const r = await Promise.race([job, new Promise((ok) => setTimeout(() => ok(late), 50_000))]);
       if (r !== late) return res.json({ reply: r.result });
       res.json({ pending: true });
-      job.then(({ result }) => io.notify?.(`🤝 Поручение от ${from}: «${text.slice(0, 200)}»\n\n${result.slice(0, 3500)}`))
-        .catch((e) => io.notify?.(`⚠️ Поручение от ${from} не выполнено: ${e.message}`));
+      job.catch(() => {});
     } catch (e) {
       res.status(503).json({ error: e.message });
     }
   });
 
-  app.use('/api', (req, res, next) => (authed(req.headers['x-token']) ? next() : res.status(401).json({ error: 'auth' })));
+  // токен — в заголовке, а для ссылок на файлы (<img>, <video>, скачивание) — в ?t=
+  app.use('/api', (req, res, next) => (authed(req.headers['x-token'] || req.query.t) ? next() : res.status(401).json({ error: 'auth' })));
 
   app.get('/api/state', (_, res) => res.json(snapshot()));
 
-  app.post('/api/tasks', (req, res) => {
-    const { text, agent = 'mirik' } = req.body || {};
-    if (!text?.trim()) return res.status(400).json({ error: 'Пустое задание' });
+  app.post('/api/tasks', async (req, res) => {
+    const { text = '', agent = 'mirik', files } = req.body || {};
+    if (!String(text).trim() && !files?.length) return res.status(400).json({ error: 'Пустое задание' });
     if (!AGENT_LIST.some((a) => a.id === agent)) return res.status(400).json({ error: 'Нет такого агента' });
-    const io = ownerIO();
-    const notifyDone = (task, result) => io.notify?.(`✅ Задание из офиса выполнено:\n«${task.text.slice(0, 100)}»\n\n${result.slice(0, 3500)}`);
+    let input;
+    try { input = await withFiles(String(text).trim(), files); } catch (e) { return res.status(400).json({ error: 'Файл не найден: ' + e.message }); }
     // Мирику — с памятью диалога офиса, сотрудникам — напрямую
     if (agent === 'mirik') {
       let created;
-      talkToMirik('panel', { text: text.trim(), source: 'panel', onTask: (t) => (created = t) }, io)
-        .then(({ task, result }) => notifyDone(task, result))
-        .catch(() => {});
+      talkToMirik(PANEL_CHAT, { text: input.text, content: input.content, source: 'panel', onTask: (t) => { t.files = input.files; created = t; } }).catch(() => {});
       return res.json({ task: publicTask(created) });
     }
-    const task = createTask({ text: text.trim(), agent, source: 'panel' });
-    runTask(task, io).then((result) => notifyDone(task, result)).catch(() => {});
+    const task = createTask({ text: input.text, agent, source: 'panel' });
+    task.files = input.files;
+    runTask(task, {}, { input: input.content }).catch(() => {});
     res.json({ task: publicTask(task) });
   });
+
+  // Загрузка файла из чата: тело запроса — сам файл, имя — в заголовке x-filename
+  app.post('/api/upload', express.raw({ type: () => true, limit: '50mb' }), async (req, res) => {
+    const raw = decodeURIComponent(String(req.headers['x-filename'] || 'file'));
+    const name = path.basename(raw).replace(/[\\/:*?"<>|\x00-\x1f]+/g, '_').replace(/^\.+/, '').slice(-120) || 'file';
+    if (!Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: 'Пустой файл' });
+    let rel = path.join('inbox', name);
+    try { await fs.access(wsPath(rel)); rel = path.join('inbox', `${Date.now().toString(36)}_${name}`); } catch {}
+    await fs.mkdir(path.dirname(wsPath(rel)), { recursive: true });
+    await fs.writeFile(wsPath(rel), req.body);
+    res.json({ path: rel, name: path.basename(rel), size: req.body.length });
+  });
+
+  // Файлы рабочей папки: показать в чате или скачать (?download=1)
+  app.get('/api/files', async (req, res) => {
+    try {
+      const full = wsPath(String(req.query.path || ''));
+      if (!(await fs.stat(full)).isFile()) throw new Error('Это не файл');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'");
+      if (req.query.download) return res.download(full, path.basename(full), { dotfiles: 'allow' });
+      res.sendFile(full, { dotfiles: 'allow' });
+    } catch (e) {
+      res.status(404).json({ error: e.message });
+    }
+  });
+
+  // Доступы (логины/пароли для сайтов): значения сюда только приходят, обратно не отдаются
+  app.get('/api/secrets', (_, res) => res.json({ names: secretNames() }));
+  app.post('/api/secrets', (req, res) => {
+    const name = String(req.body?.name || '').trim();
+    const value = String(req.body?.value ?? '');
+    if (!/^[a-zA-Z0-9_]{1,40}$/.test(name)) return res.status(400).json({ error: 'Имя — латиница, цифры и _, до 40 символов' });
+    if (!value) return res.status(400).json({ error: 'Пустое значение' });
+    setSecret(name, value);
+    res.json({ ok: true, names: secretNames() });
+  });
+  app.post('/api/secrets/:name/delete', (req, res) => {
+    deleteSecret(req.params.name);
+    res.json({ ok: true, names: secretNames() });
+  });
+
+  // Долгая память Мирика и сброс текущего диалога
+  app.get('/api/memory', (_, res) => res.json({ facts: memdb.listFacts(200) }));
+  app.post('/api/memory/:id/delete', (req, res) => res.json({ ok: memdb.deleteFact(Number(req.params.id)) }));
+  app.post('/api/memory/clear', (_, res) => { memdb.clearFacts(); res.json({ ok: true }); });
+  app.post('/api/chat/reset', (_, res) => { memdb.resetChat(PANEL_CHAT); res.json({ ok: true }); });
 
   app.get('/api/usage', async (_, res) => res.json(await usageReport()));
 
@@ -153,7 +191,7 @@ export function startServer() {
     for (const c of wss.clients) if (c.readyState === 1) c.send(msg);
   });
 
-  watchBalance((text) => ownerIO().notify?.(text) ?? Promise.resolve());
+  watchBalance(async (text) => log('mirik', text, 'alert'));
 
   server.listen(config.port, () => console.log(`[office] http://localhost:${config.port}`));
 }
