@@ -1,4 +1,4 @@
-// Память Мирика: журнал выполненных задач + факты, поиск BM25 (без сторонних моделей),
+// Память Арслана: журнал выполненных задач + факты, поиск BM25 (без сторонних моделей),
 // сводка старой переписки, состояние офиса и вычистка секретов из всего, что хранится.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -60,8 +60,8 @@ export function officeState(agentState, AGENTS, currentTaskId) {
     const last = t.steps.slice(-3).map((s) => `${AGENTS[s.agent]?.name}: ${s.text.replace(/\n+/g, ' ').slice(0, 120)}`).join(' | ');
     lines.push(`- «${t.text.slice(0, 120)}» (начата ${ago(t.createdAt)}; участвуют: ${who || '—'}) — последние шаги: ${last}`);
   }
-  const busy = Object.values(agentState).filter((s) => s.status !== 'idle' && s.id !== 'mirik');
-  lines.push('Сотрудники: ' + Object.values(agentState).filter((s) => s.id !== 'mirik').map((s) => `${AGENTS[s.id].name} — ${s.status === 'idle' ? 'свободен' : s.activity}`).join('; '));
+  const busy = Object.values(agentState).filter((s) => s.status !== 'idle' && s.id !== 'arslan');
+  lines.push('Сотрудники: ' + Object.values(agentState).filter((s) => s.id !== 'arslan').map((s) => `${AGENTS[s.id].name} — ${s.status === 'idle' ? 'свободен' : s.activity}`).join('; '));
   const done = store.tasks.filter((t) => ['done', 'failed', 'cancelled', 'interrupted'].includes(t.status) && t.id !== currentTaskId).slice(-6);
   if (done.length) {
     lines.push('Недавно завершено:');
@@ -70,7 +70,7 @@ export function officeState(agentState, AGENTS, currentTaskId) {
   const files = recentFiles();
   if (files.length) lines.push('Свежие файлы в рабочей папке: ' + files.map((f) => f.p).join(', '));
   const secrets = secretNames();
-  lines.push(`Доступы (секреты): ${secrets.length ? secrets.join(', ') : 'нет'}.${secrets.includes('eclass_pass') ? ' Доступ к e-class ЕСТЬ — Боря может входить.' : ' Доступа к e-class нет.'}`);
+  lines.push(`Доступы (секреты): ${secrets.length ? secrets.join(', ') : 'нет'}.${secrets.includes('eclass_pass') ? ' Доступ к e-class ЕСТЬ — Гермес может входить.' : ' Доступа к e-class нет.'}`);
   if (busy.length) lines.push('Если владелец спрашивает «как там/какой этап» — отвечай по этим данным, НЕ запускай задачу заново.');
   return lines.join('\n');
 }
@@ -80,7 +80,7 @@ export async function compressHistory(chatId, summarize) {
   const rows = memdb.pendingForSummary(chatId);
   if (!rows.length) return;
   const prev = memdb.summary(chatId);
-  const text = rows.map((m) => `${m.role === 'user' ? 'Владелец' : 'Мирик'}: ${String(m.content).slice(0, 600)}`).join('\n');
+  const text = rows.map((m) => `${m.role === 'user' ? 'Владелец' : 'Арслан'}: ${String(m.content).slice(0, 600)}`).join('\n');
   let out = '';
   try { out = await summarize(prev, text); } catch { return; }
   const [sumPart, factPart = ''] = out.split(/\n?ФАКТЫ:\s*\n?/i);

@@ -36,7 +36,7 @@ export const sandboxSpawn = () => (sandbox ? { uid: sandbox.uid, gid: sandbox.gi
 
 fs.mkdirSync(SANDBOX_HOME, { recursive: true });
 if (sandbox) {
-  // файлы, которые пишет сам Мирик (скачивания, решения), должны быть доступны агентам на запись
+  // файлы, которые пишет сам Арслан (скачивания, решения), должны быть доступны агентам на запись
   process.umask(0o002);
   const ws = config.workspaceDir;
   execFileSync('chown', ['-R', `root:${sandbox.gid}`, ws]);

@@ -1,7 +1,7 @@
 {
-  "name": "mirik",
+  "name": "algo-office",
   "version": "0.1.0",
-  "description": "Мирик — старший ИИ-агент: Telegram-бот + игровой офис-админка",
+  "description": "Algo Office — веб-офис ИИ-сотрудников во главе с Арсланом",
   "type": "module",
   "main": "src/index.js",
   "engines": {

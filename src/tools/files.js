@@ -9,7 +9,7 @@ import { sandboxSpawn } from '../sandbox.js';
 const inside = (root, p) => { const rel = path.relative(root, p); return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)); };
 
 // Путь строго внутри рабочей папки — с учётом символических ссылок: агент может создать ссылку
-// на чужой файл, а читает/пишет её уже сам Мирик (с правами root).
+// на чужой файл, а читает/пишет её уже сам Арслан (с правами root).
 export function wsPath(p = '.') {
   const root = fsSync.realpathSync(config.workspaceDir);
   const full = path.resolve(root, String(p).replace(/^\/+/, ''));
@@ -94,8 +94,8 @@ export const fileTools = [
     async run({ path: p, caption }, ctx) {
       const full = wsPath(p);
       await fs.access(full);
-      // по поручению Мирика файлы отдаёт он сам — иначе в чат придёт несколько копий
-      if (ctx.depth > 0) return `Не отправляю: итоговый файл отправит Мирик. Укажи в отчёте путь ${p}.`;
+      // по поручению Арслана файлы отдаёт он сам — иначе в чат придёт несколько копий
+      if (ctx.depth > 0) return `Не отправляю: итоговый файл отправит Арслан. Укажи в отчёте путь ${p}.`;
       await ctx.sendFile?.(full, caption);
       return 'Файл отправлен пользователю';
     },

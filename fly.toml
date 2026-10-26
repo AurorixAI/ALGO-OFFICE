@@ -1,4 +1,4 @@
-app = "mirik-hq"
+app = "algo-office"
 primary_region = "fra"
 
 [build]
@@ -9,7 +9,7 @@ primary_region = "fra"
   MODEL = "z-ai/glm-5.3-flash"
 
 [[mounts]]
-  source = "mirik_data"
+  source = "algo_data"
   destination = "/data"
 
 [http_service]

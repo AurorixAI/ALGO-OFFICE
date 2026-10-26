@@ -1,7 +1,7 @@
-// Долгая память Мирика: SQLite (WAL) + полнотекстовый поиск FTS5.
+// Долгая память Арслана: SQLite (WAL) + полнотекстовый поиск FTS5.
 // Здесь живут факты о владельце, журнал выполненных задач, ВСЯ переписка (архив) и сводки чатов.
 // Эмбеддингов нет сознательно (только GLM): поиск по словам с учётом окончаний, а «по смыслу» —
-// агентно: Мирик сам переформулирует запрос через инструмент recall.
+// агентно: Арслан сам переформулирует запрос через инструмент recall.
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -125,7 +125,7 @@ export function search(text, { k = 6, skipMsgIds = new Set(), skipTaskIds = new 
     } else if (r.kind === 'msg') {
       if (skipMsgIds.has(Number(r.ref))) continue;
       const m = q('SELECT * FROM messages WHERE id = ?').get(Number(r.ref));
-      if (m) push(`[${when(m.t)}] ${m.role === 'user' ? 'владелец' : 'Мирик'}: ${m.content.replace(/\n+/g, ' ').slice(0, 400)}`, 'm' + m.content);
+      if (m) push(`[${when(m.t)}] ${m.role === 'user' ? 'владелец' : 'Арслан'}: ${m.content.replace(/\n+/g, ' ').slice(0, 400)}`, 'm' + m.content);
     }
   }
   return out;

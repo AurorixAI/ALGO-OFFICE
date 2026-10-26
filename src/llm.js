@@ -38,7 +38,7 @@ export async function chat({ messages, tools, temperature = 0.4, maxTokens = 400
           Authorization: `Bearer ${config.openrouterKey}`,
           'Content-Type': 'application/json',
           'HTTP-Referer': config.publicUrl,
-          'X-Title': 'Mirik',
+          'X-Title': 'Algo Office',
         },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(180_000),

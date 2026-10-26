@@ -1,4 +1,4 @@
-"""Чтение и создание документов для агентов Мирика.
+"""Чтение и создание документов для агентов Арслана.
 
 read  <path>                 -> текст PDF / DOCX / PPTX / XLSX / TXT в stdout
 docx  <path>  (markdown в stdin) -> собрать .docx из простого markdown

@@ -16,6 +16,15 @@ try {
   db = { ...db, ...JSON.parse(fs.readFileSync(file, 'utf8')) };
 } catch {}
 
+// переименование сотрудников (Мирик HQ → Algo Office): старые id в сохранённых задачах и статистике
+const RENAMED = { mirik: 'arslan', timur: 'prometheus', liza: 'artemis', borya: 'hermes', nika: 'athena', vlad: 'apollo', arina: 'calliope', gosha: 'hephaestus', artem: 'ares', dina: 'themis', kamila: 'aphrodite', bakhtiyor: 'zeus' };
+const renamed = (id) => RENAMED[id] || id;
+for (const t of db.tasks) {
+  t.agent = renamed(t.agent);
+  for (const st of t.steps || []) st.agent = renamed(st.agent);
+}
+if (db.stats.byAgent) db.stats.byAgent = Object.fromEntries(Object.entries(db.stats.byAgent).map(([id, v]) => [renamed(id), v]));
+
 let timer = null;
 function flush() {
   clearTimeout(timer);

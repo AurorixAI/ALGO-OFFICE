@@ -59,7 +59,7 @@ async function snapshot(page) {
     for (const el of document.querySelectorAll(sel)) {
       const r = el.getBoundingClientRect();
       if (r.width < 2 || r.height < 2 || getComputedStyle(el).visibility === 'hidden') continue;
-      el.setAttribute('data-mirik', String(++i));
+      el.setAttribute('data-algo', String(++i));
       const label = (el.innerText || el.value || el.placeholder || el.getAttribute('aria-label') || el.name || el.title || '').trim().slice(0, 60);
       const extra = el.tagName === 'INPUT' ? ` type=${el.type}` : el.tagName === 'A' ? ` href=${el.getAttribute('href') || ''}`.slice(0, 120) : '';
       out.push(`[${i}] ${el.tagName.toLowerCase()}${extra} "${label}"`);
@@ -71,7 +71,7 @@ async function snapshot(page) {
   return `URL: ${page.url()}\nЗаголовок: ${await page.title()}\n\nТЕКСТ:\n${text}\n\nЭЛЕМЕНТЫ:\n${elements.join('\n')}`;
 }
 
-const el = (page, id) => page.locator(`[data-mirik="${id}"]`).first();
+const el = (page, id) => page.locator(`[data-algo="${id}"]`).first();
 
 // Отдельная страница под рендер роликов/обложек: точный размер кадра, без масштабирования
 export async function newRenderPage(width, height) {

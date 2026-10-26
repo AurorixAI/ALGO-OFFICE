@@ -1,4 +1,4 @@
-// Цикл работы агентов: думаем -> вызываем инструменты -> отчитываемся. Мирик делегирует подчинённым.
+// Цикл работы агентов: думаем -> вызываем инструменты -> отчитываемся. Арслан делегирует подчинённым.
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chat } from '../llm.js';
@@ -40,7 +40,7 @@ function setState(id, patch) {
 // ---------- задачи ----------
 const running = new Map(); // taskId -> { cancelled, paused, tokens }
 
-export function createTask({ text, agent = 'mirik', source = 'panel', chatId = null }) {
+export function createTask({ text, agent = 'arslan', source = 'panel', chatId = null }) {
   const task = {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
     text: scrub(text).slice(0, 2000),
@@ -142,13 +142,13 @@ const builtinTools = [
     parameters: {
       type: 'object',
       properties: {
-        agent: { type: 'string', enum: AGENT_LIST.filter((a) => a.id !== 'mirik').map((a) => a.id) },
+        agent: { type: 'string', enum: AGENT_LIST.filter((a) => a.id !== 'arslan').map((a) => a.id) },
         task: { type: 'string', description: 'Подробное задание со всем нужным контекстом' },
       },
       required: ['agent', 'task'],
     },
     async run({ agent, task }, ctx) {
-      if (!AGENTS[agent] || agent === 'mirik') return 'Нет такого сотрудника';
+      if (!AGENTS[agent] || agent === 'arslan') return 'Нет такого сотрудника';
       if (ctx.depth > 1) return 'Слишком глубокое делегирование';
       bus.emit('event', { type: 'delegate', from: ctx.agentId, to: agent, text: task.slice(0, 120) });
       log(ctx.agentId, `→ ${AGENTS[agent].name}: ${task}`, 'delegate');
@@ -196,7 +196,7 @@ const builtinTools = [
       const res = await fetch(`${config.sanyaUrl}/link/ask`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${config.linkToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, from: AGENTS[ctx.agentId]?.name || 'Мирик', chat_id: typeof ctx.task?.chatId === 'number' ? ctx.task.chatId : store.homeChat }),
+        body: JSON.stringify({ text, from: AGENTS[ctx.agentId]?.name || 'Арслан', chat_id: typeof ctx.task?.chatId === 'number' ? ctx.task.chatId : store.homeChat }),
         signal: AbortSignal.timeout(90_000),
       });
       const data = await res.json().catch(() => ({}));
@@ -258,7 +258,7 @@ function compact(messages) {
   }
 }
 
-function mirikContext(ctx, input) {
+function arslanContext(ctx, input) {
   const query = typeof input === 'string' ? input : input.find?.((p) => p.type === 'text')?.text || '';
   const parts = [];
   const facts = memdb.listFacts(40);
@@ -275,8 +275,8 @@ function mirikContext(ctx, input) {
 export async function runAgent({ agentId, input, history = [], ctx }) {
   const agent = AGENTS[agentId];
   const tools = agent.tools.map((n) => TOOLS[n]).filter(Boolean);
-  const maxSteps = agentId === 'mirik' ? 15 : 20;
-  const extra = agentId === 'mirik' ? mirikContext(ctx, input) : '';
+  const maxSteps = agentId === 'arslan' ? 15 : 20;
+  const extra = agentId === 'arslan' ? arslanContext(ctx, input) : '';
   const system = `${agent.prompt}${extra}\n\nСейчас: ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Tashkent' })}. Рабочая папка общая для всей команды. Экономь токены: не перечитывай одно и то же, не повторяй шаги.`;
   const messages = [{ role: 'system', content: system }, ...history, { role: 'user', content: input }];
   const budget = (ctx.control ||= {});
@@ -352,7 +352,7 @@ export async function runAgent({ agentId, input, history = [], ctx }) {
   }
 }
 
-// Главная точка входа: задание для Мирика (или конкретного агента).
+// Главная точка входа: задание для Арслана (или конкретного агента).
 // Уведомления, файлы и скриншоты агентов прикрепляются к задаче и видны в чате офиса.
 export async function runTask(task, io = {}, { input, history = [] } = {}) {
   const control = { cancelled: false };
@@ -386,9 +386,9 @@ export async function runTask(task, io = {}, { input, history = [] } = {}) {
   }
 }
 
-// Диалог с Мириком в чате с памятью разговора.
-export async function talkToMirik(chatId, { text, content, source = 'panel', onTask }, io = {}) {
-  const task = createTask({ text, agent: 'mirik', source, chatId });
+// Диалог с Арсланом в чате с памятью разговора.
+export async function talkToArslan(chatId, { text, content, source = 'panel', onTask }, io = {}) {
+  const task = createTask({ text, agent: 'arslan', source, chatId });
   onTask?.(task);
   const window = memdb.history(chatId, 20);
   const history = window.map(({ role, content }) => ({ role, content }));
@@ -399,9 +399,9 @@ export async function talkToMirik(chatId, { text, content, source = 'panel', onT
   compressHistory(chatId, async (prev, chunk) => (await chat({
     maxTokens: 900,
     temperature: 0.2,
-    agent: 'mirik',
+    agent: 'arslan',
     messages: [
-      { role: 'system', content: 'Сожми переписку владельца с ИИ-агентом Мириком. Формат ответа строго:\nСВОДКА:\n<до 1500 символов по пунктам: договорённости, решения, текущие дела, что сделано и что осталось>\nФАКТЫ:\n- <долгие факты о владельце: учёба, работа, предпочтения, люди, цели — по одному в строке; если новых нет, напиши «- нет»>' },
+      { role: 'system', content: 'Сожми переписку владельца с ИИ-агентом Арсланом. Формат ответа строго:\nСВОДКА:\n<до 1500 символов по пунктам: договорённости, решения, текущие дела, что сделано и что осталось>\nФАКТЫ:\n- <долгие факты о владельце: учёба, работа, предпочтения, люди, цели — по одному в строке; если новых нет, напиши «- нет»>' },
       { role: 'user', content: `Прошлая сводка:\n${prev || '—'}\n\nНовая часть переписки:\n${chunk}` },
     ],
   })).content || prev).catch(() => {});

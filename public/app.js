@@ -6,10 +6,10 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 const AGENT_STATUS = { idle: 'свободен', thinking: 'думает', working: 'работает', managing: 'раздаёт задачи', paused: 'на паузе' };
 const ACTIVE = new Set(['running', 'queued', 'paused']);
 const TASK_STATUS = { running: ['в работе', 'working'], queued: ['в очереди', 'thinking'], paused: ['на паузе', 'paused'], done: ['готово', 'done'], failed: ['ошибка', 'failed'], cancelled: ['отменено', 'cancelled'], interrupted: ['прервано', 'failed'] };
-const state = { agents: {}, departments: {}, tasks: new Map(), openSteps: new Set(), to: 'mirik', stats: null, attach: [] };
+const state = { agents: {}, departments: {}, tasks: new Map(), openSteps: new Set(), to: 'arslan', stats: null, attach: [] };
 const coarse = matchMedia('(pointer: coarse)').matches;
 let token = null;
-try { token = localStorage.getItem('mirik_token'); } catch {}
+try { token = localStorage.getItem('algo_token'); } catch {}
 
 const office = new Office($('#office'), { onSelect: (id) => { showCard(id); renderCrew(); } });
 
@@ -65,7 +65,7 @@ async function login(payload) {
   const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   if (!res.ok) throw new Error((await res.json()).error || 'Ошибка входа');
   token = (await res.json()).token;
-  try { localStorage.setItem('mirik_token', token); } catch {}
+  try { localStorage.setItem('algo_token', token); } catch {}
 }
 
 function showLogin() {
@@ -245,7 +245,7 @@ function messageHTML(t) {
   const userText = t.files?.length ? t.text.replace(FILES_NOTE, '') : t.text;
   const userFiles = t.files?.length ? `<div class="files">${t.files.map((f) => `<a class="chip" href="${fileURL(f, true)}">📎 <span>${esc(f.split('/').pop())}</span></a>`).join('')}</div>` : '';
   const atts = t.attachments?.length ? `<div class="atts">${t.attachments.map(attachmentHTML).join('')}</div>` : '';
-  const to = t.agent !== 'mirik' ? `<span>→ ${esc(a.name)}</span>` : '';
+  const to = t.agent !== 'arslan' ? `<span>→ ${esc(a.name)}</span>` : '';
   const running = ACTIVE.has(t.status);
   const last = t.steps.at(-1);
   const steps = t.steps.length
@@ -353,9 +353,9 @@ addEventListener('keydown', (e) => { if (e.key === 'Escape') closePopup(); });
 $('#tasksPop').addEventListener('click', (e) => { const b = e.target.closest('[data-act]'); if (b) taskAction(b.dataset.act, b.dataset.id, b); });
 
 function welcomeHTML() {
-  const m = state.agents.mirik;
+  const m = state.agents.arslan;
   const ideas = ['Зайди на сайт школы, выгрузи домашку на завтра и реши её', 'Найди 5 лучших бесплатных курсов по Python и сравни их', 'Напиши скрипт, который переименует фото по дате съёмки', 'Сделай краткий конспект темы «Фотосинтез» для 7 класса'];
-  return `<div class="welcome">${m ? `<img src="${avatarURL('mirik', m.look, 144)}" alt="">` : ''}
+  return `<div class="welcome">${m ? `<img src="${avatarURL('arslan', m.look, 144)}" alt="">` : ''}
     <h2>Привет, босс!</h2><p>Дай задание — я раздам его команде и пришлю результат.</p>
     <div class="suggest">${ideas.map((i) => `<button data-idea="${esc(i)}">${esc(i)}</button>`).join('')}</div></div>`;
 }
@@ -456,7 +456,7 @@ function renderTo() {
     return `${sep}<button type="button" data-to="${a.id}" class="${state.to === a.id ? 'on' : ''}"><img src="${avatarURL(a.id, a.look)}" alt="">${esc(a.name)}</button>`;
   }).join('');
   const a = state.agents[state.to];
-  $('#msg').placeholder = state.to === 'mirik' ? 'Задание для Мирика…' : `${a?.name}, вот задание…`;
+  $('#msg').placeholder = state.to === 'arslan' ? 'Задание для Арслана…' : `${a?.name}, вот задание…`;
 }
 function setTo(id) { state.to = id; renderTo(); }
 $('#to').addEventListener('click', (e) => { const b = e.target.closest('[data-to]'); if (b) setTo(b.dataset.to); });
@@ -553,14 +553,14 @@ function renderSettings(names, facts) {
         <button class="btn primary" type="submit">Сохранить</button>
       </form>
       <div class="set-list">${names.length ? names.map((n) => `<div class="set-item"><span><code>${esc(n)}</code></span><button data-delsecret="${esc(n)}">Удалить</button></div>`).join('') : '<div class="note">Пока пусто.</div>'}</div>
-      <div class="note">Боря вводит эти логины и пароли в формы на сайтах по имени, но самих значений не видит. Обратно значения не показываются. Для e-class нужны <code>eclass_login</code> и <code>eclass_pass</code>.</div>
+      <div class="note">Гермес вводит эти логины и пароли в формы на сайтах по имени, но самих значений не видит. Обратно значения не показываются. Для e-class нужны <code>eclass_login</code> и <code>eclass_pass</code>.</div>
     </section>
-    <section class="bcard"><h4>🧠 Что Мирик помнит о тебе · ${facts.length}</h4>
+    <section class="bcard"><h4>🧠 Что Арслан помнит о тебе · ${facts.length}</h4>
       <div class="set-list">${facts.length ? facts.map((f) => `<div class="set-item"><span>${esc(f.text)}</span><button data-forget="${f.id}">Забыть</button></div>`).join('') : '<div class="note">Память пуста.</div>'}</div>
       ${facts.length ? '<div class="bubble-actions"><button class="stop" data-forgetall>Стереть всё</button></div>' : ''}
     </section>
     <section class="bcard"><h4>💬 Диалог</h4>
-      <div class="note" style="margin:0 0 10px">Новый диалог: Мирик забудет текущую переписку в чате. Долгая память и история задач останутся.</div>
+      <div class="note" style="margin:0 0 10px">Новый диалог: Арслан забудет текущую переписку в чате. Долгая память и история задач останутся.</div>
       <button class="btn ghost" data-resetchat>🧹 Начать диалог заново</button>
     </section>`;
 }
@@ -579,8 +579,8 @@ $('#v-settings').addEventListener('click', async (e) => {
   if (ds && confirm(`Удалить доступ «${ds.dataset.delsecret}»?`)) { await api(`/api/secrets/${encodeURIComponent(ds.dataset.delsecret)}/delete`, {}); loadSettings(); }
   const fg = e.target.closest('[data-forget]');
   if (fg) { await api(`/api/memory/${fg.dataset.forget}/delete`, {}); loadSettings(); }
-  if (e.target.closest('[data-forgetall]') && confirm('Стереть всю долгую память Мирика?')) { await api('/api/memory/clear', {}); loadSettings(); }
-  if (e.target.closest('[data-resetchat]') && confirm('Начать диалог с Мириком заново?')) { await api('/api/chat/reset', {}); toast('🧹 Диалог начат заново'); }
+  if (e.target.closest('[data-forgetall]') && confirm('Стереть всю долгую память Арслана?')) { await api('/api/memory/clear', {}); loadSettings(); }
+  if (e.target.closest('[data-resetchat]') && confirm('Начать диалог с Арсланом заново?')) { await api('/api/chat/reset', {}); toast('🧹 Диалог начат заново'); }
 });
 
 // ---------- бюджет ----------
@@ -631,7 +631,7 @@ function barsHTML(points, fmt) {
 function renderBudget() {
   const r = state.usage;
   if (!r) return;
-  const or = r.openrouter, est = r.estimate, m = r.mirik;
+  const or = r.openrouter, est = r.estimate, m = r.arslan;
   const parts = [];
   if (or.error) parts.push(`<section class="bcard"><h4>Баланс OpenRouter</h4><div class="empty">Недоступен: ${esc(or.error)}</div></section>`);
   else {
@@ -648,13 +648,13 @@ function renderBudget() {
         <div><b>${est?.tasksLeft ? '≈ ' + bigNum(est.tasksLeft) : '—'}</b><span>заданий хватит</span></div>
         <div><b>${money(est?.avgTaskCost)}</b><span>среднее задание</span></div>
       </div>
-      ${or.keyLimit != null ? `<div class="note">У ключа Мирика свой лимит: осталось ${money(or.keyRemaining)} из ${money(or.keyLimit)}. Сегодня по ключу ${money(or.keyUsageDaily)}, за месяц ${money(or.keyUsageMonthly)}.</div>` : ''}
+      ${or.keyLimit != null ? `<div class="note">У ключа Арслана свой лимит: осталось ${money(or.keyRemaining)} из ${money(or.keyLimit)}. Сегодня по ключу ${money(or.keyUsageDaily)}, за месяц ${money(or.keyUsageMonthly)}.</div>` : ''}
     </section>`);
   }
   const days = lastDays(14);
   const today = m.daily[todayKey()] || {};
   parts.push(`<section class="bcard">
-    <h4>👑 Мирик — расход по дням</h4>
+    <h4>👑 Арслан — расход по дням</h4>
     <div class="kpis small">
       <div><b>${money(today.cost || 0)}</b><span>сегодня</span></div>
       <div><b>${bigNum(today.tokens || 0)}</b><span>токенов сегодня</span></div>

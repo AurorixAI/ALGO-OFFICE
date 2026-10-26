@@ -1,7 +1,7 @@
 // Игровой офис v2: детальная пиксельная графика, освещение, камера (зум/панорама), агенты и кот.
 export const T = 32;
 export const W = 36;
-// x < 23 — операционный департамент и кабинет Мирика, x = 23 — стена с дверью, x > 23 — студия ютуберов
+// x < 23 — операционный департамент и кабинет Арслана, x = 23 — стена с дверью, x > 23 — студия ютуберов
 const STUDIO_X = 24;
 const DOOR_Y = 10;
 export const H = 29;
@@ -67,7 +67,7 @@ add('arcade', 13, 12);
 add('catbed', 12, 15, 1, 1, { walkable: true, flat: true });
 add('plant', 14, 15);
 add('bookcase', 7, 15, 1, 1);
-// кабинет Мирика
+// кабинет Арслана
 add('rug', 17, 3, 5, 3, { walkable: true, flat: true, boss: true });
 add('bookshelf', 21, 2, 2, 1);
 add('plant', 16, 2, 1, 1, { big: true });
@@ -141,9 +141,9 @@ const POIS = [
   { x: 7, y: 14, dir: 'down', say: '📖 почитаю', who: 'staff' },
   { x: 16, y: 9, dir: 'right', say: '🗣 обсуждаем', who: 'all' },
   { x: 21, y: 10, dir: 'left', say: '📊 созвон', who: 'all' },
-  { x: 18, y: 2, dir: 'up', say: '🌇 думаю о вечном', who: 'mirik' },
-  { x: 21, y: 3, dir: 'up', say: '📚 перечитываю', who: 'mirik' },
-  { x: 17, y: 5, dir: 'right', say: '📞 переговоры', who: 'mirik' },
+  { x: 18, y: 2, dir: 'up', say: '🌇 думаю о вечном', who: 'arslan' },
+  { x: 21, y: 3, dir: 'up', say: '📚 перечитываю', who: 'arslan' },
+  { x: 17, y: 5, dir: 'right', say: '📞 переговоры', who: 'arslan' },
   // студия
   { x: 33, y: 3, dir: 'down', say: '🎥 пишем дубль', who: 'yt' },
   { x: 32, y: 5, dir: 'right', say: '💡 свет норм?', who: 'yt' },
@@ -384,7 +384,7 @@ function drawCat(c, x, y, o) {
 }
 
 // ---------- экраны мониторов ----------
-const SCREEN = { timur: 'code', liza: 'search', borya: 'browser', nika: 'doc', mirik: 'dash', vlad: 'trends', arina: 'script', gosha: 'timeline', artem: 'dash', dina: 'sheet', kamila: 'browser', bakhtiyor: 'dash' };
+const SCREEN = { prometheus: 'code', artemis: 'search', hermes: 'browser', athena: 'doc', arslan: 'dash', apollo: 'trends', calliope: 'script', hephaestus: 'timeline', ares: 'dash', themis: 'sheet', aphrodite: 'browser', zeus: 'dash' };
 function drawScreen(c, x, y, w, h, kind, busy, t, seed) {
   if (!kind) { px(c, x, y, w, h, '#0e1018'); px(c, x + 2, y + 2, 4, 1, 'rgba(255,255,255,.08)'); return; }
   if (!busy) {
@@ -458,20 +458,20 @@ function drawScreen(c, x, y, w, h, kind, busy, t, seed) {
 
 // ---------- офис ----------
 const GLYPHS = {
-  timur: ['{ }', '</>', '01', '=>', 'fn()', ';'],
-  liza: ['🔎', '📄', 'www', '?', '📚'],
-  borya: ['🖱', '🌐', '⌨', '↗', '🔑'],
-  nika: ['∑', '✎', 'π', 'A+', '√x', '📐'],
-  mirik: ['📣', '✔', '💼', '📊'],
-  vlad: ['📈', '🔥', '👀', '#'],
-  arina: ['✍️', '🎬', '💡', '“ ”'],
-  gosha: ['🎞', '✂️', '▶', '🎧'],
-  artem: ['📊', '🔍', 'TAM', '📈'],
-  dina: ['💵', '%', 'Σ', 'LTV'],
-  kamila: ['🛒', '🤔', '💸', '👎', '👍'],
-  bakhtiyor: ['💰', '📈', '🤝', 'x10'],
+  prometheus: ['{ }', '</>', '01', '=>', 'fn()', ';'],
+  artemis: ['🔎', '📄', 'www', '?', '📚'],
+  hermes: ['🖱', '🌐', '⌨', '↗', '🔑'],
+  athena: ['∑', '✎', 'π', 'A+', '√x', '📐'],
+  arslan: ['📣', '✔', '💼', '📊'],
+  apollo: ['📈', '🔥', '👀', '#'],
+  calliope: ['✍️', '🎬', '💡', '“ ”'],
+  hephaestus: ['🎞', '✂️', '▶', '🎧'],
+  ares: ['📊', '🔍', 'TAM', '📈'],
+  themis: ['💵', '%', 'Σ', 'LTV'],
+  aphrodite: ['🛒', '🤔', '💸', '👎', '👍'],
+  zeus: ['💰', '📈', '🤝', 'x10'],
 };
-const GLOW = { timur: '80,200,255', liza: '190,120,255', borya: '90,255,150', nika: '255,120,200', mirik: '255,210,80', vlad: '255,80,90', arina: '255,200,60', gosha: '255,140,50', artem: '93,173,226', dina: '46,204,113', kamila: '253,121,168', bakhtiyor: '255,200,60' };
+const GLOW = { prometheus: '80,200,255', artemis: '190,120,255', hermes: '90,255,150', athena: '255,120,200', arslan: '255,210,80', apollo: '255,80,90', calliope: '255,200,60', hephaestus: '255,140,50', ares: '93,173,226', themis: '46,204,113', aphrodite: '253,121,168', zeus: '255,200,60' };
 const EMPTY_DESKS = [{ x: 10, y: 4 }, { x: 10, y: 8 }];
 
 export class Office {
@@ -501,7 +501,7 @@ export class Office {
   addDesk(owner, x, y, w) {
     const ex = furniture.find((f) => f.kind === 'desk' && f.x === x && f.y === y);
     if (ex) { ex.owner = owner; return ex; }
-    const boss = owner === 'mirik';
+    const boss = owner === 'arslan';
     const desk = add('desk', x, y, w, 1, { owner, boss });
     if (!boss) furniture.push({ kind: 'chair', x, y, w: 0, h: 0, cx: (x + 1) * T, cy: (y + 1) * T + 14, walkable: true, owner });
     else furniture.push({ kind: 'bosschair', x, y, w: 0, h: 0, cx: (x + w / 2) * T, cy: y * T + 5, walkable: true, owner });
@@ -644,7 +644,7 @@ export class Office {
     for (const def of list) {
       let a = this.agents.get(def.id);
       if (!a) {
-        const boss = def.id === 'mirik';
+        const boss = def.id === 'arslan';
         const w = boss ? 3 : 2;
         this.addDesk(def.id, def.desk.x, def.desk.y, w);
         const seatTile = boss ? { x: def.desk.x + 1, y: def.desk.y - 1 } : { x: def.desk.x, y: def.desk.y + 1 };
@@ -684,7 +684,7 @@ export class Office {
 
   report(from) {
     const a = this.agents.get(from);
-    if (!a || from === 'mirik') return;
+    if (!a || from === 'arslan') return;
     this.confetti(a);
     a.plan = [
       { type: 'goto', tile: { x: 18 + Math.floor(Math.random() * 3), y: 5 }, priority: true },
@@ -692,7 +692,7 @@ export class Office {
       { type: 'say', text: 'Готово! ✅', ms: 1800, priority: true },
       { type: 'wait', ms: 1600, priority: true },
     ];
-    setTimeout(() => this.say(this.agents.get('mirik'), 'Отлично, спасибо! 👍', 2200), 900);
+    setTimeout(() => this.say(this.agents.get('arslan'), 'Отлично, спасибо! 👍', 2200), 900);
   }
 
   taskDone(agentId) { const a = this.agents.get(agentId); if (a) this.confetti(a); }
@@ -721,7 +721,7 @@ export class Office {
       return;
     }
     const taken = new Set([...this.agents.values()].map((x) => x.poi).filter(Boolean));
-    const mine = a.boss ? 'mirik' : a.dept === 'yt' ? 'yt' : a.dept === 'vc' ? 'vc' : 'staff';
+    const mine = a.boss ? 'arslan' : a.dept === 'yt' ? 'yt' : a.dept === 'vc' ? 'vc' : 'staff';
     const pois = POIS.filter((p) => !taken.has(p) && (p.who === 'all' || p.who === mine));
     if (Math.random() < 0.5 && pois.length) {
       const p = pois[Math.floor(Math.random() * pois.length)];
@@ -800,7 +800,7 @@ export class Office {
       this.step(a, dt);
       if (a.busy && a.sittingAt === a.seat && this.t > a.nextGlyph) {
         a.nextGlyph = this.t + 0.6 + Math.random() * 0.7;
-        const g = GLYPHS[a.id] || GLYPHS.timur;
+        const g = GLYPHS[a.id] || GLYPHS.prometheus;
         this.particles.push({ type: 'glyph', x: a.seat.x + (Math.random() - 0.5) * 26, y: a.seat.y - (a.boss ? 34 : 40), text: g[Math.floor(Math.random() * g.length)], born: this.t, life: 2 });
       }
     }
@@ -1214,7 +1214,7 @@ export class Office {
           box(c, X, Y + 2, w, 14, '#6b4429', { hi: '#8a5a38' });
           px(c, X, Y + 16, w, h - 12, '#4e301c'); px(c, X - 1, Y + 16, 1, h - 12, OUT); px(c, X + w, Y + 16, 1, h - 12, OUT); px(c, X - 1, Y + h + 4, w + 2, 1, OUT);
           px(c, X + 10, Y + 20, w - 20, 8, '#5a3820'); px(c, X + w / 2 - 6, Y + 22, 12, 2, '#e0b04a');
-          // монитор Мирика (видим сзади) + лампа + бумаги + табличка
+          // монитор Арслана (видим сзади) + лампа + бумаги + табличка
           box(c, X + w - 34, Y - 12, 26, 16, '#2b2d36'); px(c, X + w - 24, Y + 4, 6, 3, '#3b3e4a');
           box(c, X + 10, Y + 4, 14, 9, '#f4f0e6', { outline: '#b9b2a3' });
           box(c, X + 30, Y + 7, 18, 5, '#e0b04a', { outline: '#6b4e1f' });
@@ -1412,7 +1412,7 @@ export class Office {
             px(c, mx + 3, my + 12, 22, 3, '#2d3142'); px(c, mx + 3, my + 12, 22 * (r.pct / 100), 3, r.pct >= 100 ? '#2ecc71' : '#ff7a2f');
             c.font = '700 5px Inter, sans-serif'; c.textAlign = 'center'; c.fillStyle = '#fff';
             c.fillText(r.pct >= 100 ? 'ГОТОВО ✓' : `${r.pct}%`, mx + 14, my + 9);
-          } else drawScreen(c, mx + 2, my + 2, 24, 16, i === 1 ? 'timeline' : i === 0 ? 'trends' : 'script', this.agents.get('gosha')?.busy || !!r, this.t + i, 7 + i);
+          } else drawScreen(c, mx + 2, my + 2, 24, 16, i === 1 ? 'timeline' : i === 0 ? 'trends' : 'script', this.agents.get('hephaestus')?.busy || !!r, this.t + i, 7 + i);
         }
         box(c, X + w / 2 - 12, Y + 10, 24, 5, '#d9dce3', { outline: '#6b6f7c' });
         break;

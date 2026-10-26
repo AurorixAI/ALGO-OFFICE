@@ -67,7 +67,7 @@ export async function usageReport() {
     pricing().catch(() => null),
     sanya(),
   ]);
-  // Смешанная цена за 1 млн токенов — по реальному соотношению вход/выход у Мирика (агенты в основном читают)
+  // Смешанная цена за 1 млн токенов — по реальному соотношению вход/выход у Арслана (агенты в основном читают)
   const share = s.prompt + s.completion > 0 ? s.prompt / (s.prompt + s.completion) : 0.9;
   // Реальная цена за 1 млн токенов по фактическим счетам; пока данных мало — по прайсу самого дешёвого провайдера
   const listBlended = price ? price.prompt * share + price.completion * (1 - share) : null;
@@ -90,7 +90,7 @@ export async function usageReport() {
       avgTaskCost: tasks ? s.cost / tasks : null,
       tasksLeft: tasks && s.cost > 0 ? left / (s.cost / tasks) : null,
     },
-    mirik: { tokens: s.tokens, prompt: s.prompt || 0, completion: s.completion || 0, cost: s.cost, tasksDone: tasks, daily: s.daily || {}, byAgent: s.byAgent || {} },
+    arslan: { tokens: s.tokens, prompt: s.prompt || 0, completion: s.completion || 0, cost: s.cost, tasksDone: tasks, daily: s.daily || {}, byAgent: s.byAgent || {} },
     sanya: sanyaUsage,
   };
 }
@@ -108,7 +108,7 @@ export function watchBalance(notify) {
       if (crossed != null && crossed < last) {
         store.lowBalanceAlert = crossed;
         save();
-        await notify(`💸 На OpenRouter осталось $${left.toFixed(2)} (меньше $${crossed}). Пополни баланс, иначе Мирик и команда остановятся.`);
+        await notify(`💸 На OpenRouter осталось $${left.toFixed(2)} (меньше $${crossed}). Пополни баланс, иначе Арслан и команда остановятся.`);
       } else if (crossed == null && store.lowBalanceAlert != null) {
         delete store.lowBalanceAlert; // пополнили — снова следим за порогами
         save();

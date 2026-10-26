@@ -10,12 +10,12 @@ import { store } from './store.js';
 import { bus, log, recentLogs } from './bus.js';
 import * as memdb from './memdb.js';
 import { AGENT_LIST, DEPARTMENTS } from './agents/registry.js';
-import { agentState, createTask, runTask, cancelTask, pauseTask, resumeTask, talkToMirik } from './agents/runtime.js';
+import { agentState, createTask, runTask, cancelTask, pauseTask, resumeTask, talkToArslan } from './agents/runtime.js';
 import { wsPath } from './tools/files.js';
 import { usageReport, watchBalance } from './billing.js';
 import { setSecret, deleteSecret, secretNames } from './secrets.js';
 
-const SESSION = crypto.createHash('sha256').update('mirik:' + config.adminPassword).digest('hex');
+const SESSION = crypto.createHash('sha256').update('algo:' + config.adminPassword).digest('hex');
 const authed = (token) => typeof token === 'string' && token.length === SESSION.length && crypto.timingSafeEqual(Buffer.from(token), Buffer.from(SESSION));
 
 const PANEL_CHAT = 'panel'; // память диалога веб-чата
@@ -80,18 +80,18 @@ export function startServer() {
     if (!names.length) return res.status(400).json({ error: 'нет секретов' });
     for (const k of names) setSecret(k, secrets[k]);
     const from = String(req.body?.from || 'Саня').slice(0, 40);
-    log('mirik', `🔐 ${from} передал доступ: ${names.join(', ')}. Боря сможет заходить на сайт сам.`, 'alert');
+    log('arslan', `🔐 ${from} передал доступ: ${names.join(', ')}. Гермес сможет заходить на сайт сам.`, 'alert');
     res.json({ ok: true, saved: names });
   });
 
-  // Саня присылает задания Мирику — они видны в чате офиса как обычные задачи
+  // Саня присылает задания Арслану — они видны в чате офиса как обычные задачи
   app.post('/link/ask', async (req, res) => {
     if (!linkAuthed(req)) return res.status(401).json({ error: 'auth' });
     const text = String(req.body?.text || '').trim();
     const from = String(req.body?.from || 'Саня').slice(0, 40);
     if (!text) return res.status(400).json({ error: 'Пустое задание' });
-    const job = talkToMirik('sanya', { text: `[${from}]: ${text}`, source: 'sanya' }, { fromSanya: true });
-    // держим запрос до 50 с; дольше — Мирик доделает, а результат будет в чате офиса
+    const job = talkToArslan('sanya', { text: `[${from}]: ${text}`, source: 'sanya' }, { fromSanya: true });
+    // держим запрос до 50 с; дольше — Арслан доделает, а результат будет в чате офиса
     const late = Symbol('late');
     try {
       const r = await Promise.race([job, new Promise((ok) => setTimeout(() => ok(late), 50_000))]);
@@ -109,15 +109,15 @@ export function startServer() {
   app.get('/api/state', (_, res) => res.json(snapshot()));
 
   app.post('/api/tasks', async (req, res) => {
-    const { text = '', agent = 'mirik', files } = req.body || {};
+    const { text = '', agent = 'arslan', files } = req.body || {};
     if (!String(text).trim() && !files?.length) return res.status(400).json({ error: 'Пустое задание' });
     if (!AGENT_LIST.some((a) => a.id === agent)) return res.status(400).json({ error: 'Нет такого агента' });
     let input;
     try { input = await withFiles(String(text).trim(), files); } catch (e) { return res.status(400).json({ error: 'Файл не найден: ' + e.message }); }
-    // Мирику — с памятью диалога офиса, сотрудникам — напрямую
-    if (agent === 'mirik') {
+    // Арслану — с памятью диалога офиса, сотрудникам — напрямую
+    if (agent === 'arslan') {
       let created;
-      talkToMirik(PANEL_CHAT, { text: input.text, content: input.content, source: 'panel', onTask: (t) => { t.files = input.files; created = t; } }).catch(() => {});
+      talkToArslan(PANEL_CHAT, { text: input.text, content: input.content, source: 'panel', onTask: (t) => { t.files = input.files; created = t; } }).catch(() => {});
       return res.json({ task: publicTask(created) });
     }
     const task = createTask({ text: input.text, agent, source: 'panel' });
@@ -167,7 +167,7 @@ export function startServer() {
     res.json({ ok: true, names: secretNames() });
   });
 
-  // Долгая память Мирика и сброс текущего диалога
+  // Долгая память Арслана и сброс текущего диалога
   app.get('/api/memory', (_, res) => res.json({ facts: memdb.listFacts(200) }));
   app.post('/api/memory/:id/delete', (req, res) => res.json({ ok: memdb.deleteFact(Number(req.params.id)) }));
   app.post('/api/memory/clear', (_, res) => { memdb.clearFacts(); res.json({ ok: true }); });
@@ -191,7 +191,7 @@ export function startServer() {
     for (const c of wss.clients) if (c.readyState === 1) c.send(msg);
   });
 
-  watchBalance(async (text) => log('mirik', text, 'alert'));
+  watchBalance(async (text) => log('arslan', text, 'alert'));
 
   server.listen(config.port, () => console.log(`[office] http://localhost:${config.port}`));
 }
