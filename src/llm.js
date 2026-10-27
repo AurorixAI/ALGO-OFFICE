@@ -48,17 +48,18 @@ function target() {
 
 const hasImages = (messages) => messages.some((m) => Array.isArray(m.content) && m.content.some((p) => p.type === 'image_url'));
 
-// Модель не видит картинки (например, DeepSeek) — убираем их прямо из истории задачи, чтобы не спотыкаться на каждом шаге
+// Модель не видит картинки (например, DeepSeek) — убираем их прямо из истории задачи, чтобы не отправлять их на каждом шаге
 function dropImages(messages) {
   for (const m of messages) {
     if (!Array.isArray(m.content)) continue;
     const text = m.content.filter((p) => p.type === 'text').map((p) => p.text).join('\n');
-    m.content = `${text}\n[Картинки не переданы: эта модель не видит изображения. Опирайся на имена файлов и спроси владельца, если нужно описание.]`;
+    m.content = `${text}\n[Картинки не переданы: эта модель не видит изображения. Текст с картинки можно прочитать через read_document (OCR), а что на ней нарисовано — спроси владельца.]`;
   }
 }
 
 export async function chat({ messages, tools, temperature = 0.4, maxTokens = 4000, agent }) {
   const { url, headers, extra } = target();
+  if (!config.vision && hasImages(messages)) dropImages(messages);
   const body = { messages, temperature, max_tokens: maxTokens, ...extra };
   if (config.model) body.model = config.model;
   if (tools?.length) body.tools = tools;

@@ -35,6 +35,8 @@ if [ "$(get_env LLM_PROVIDER)" = "azure" ] || { [ -n "$(get_env AZURE_API_KEY)" 
     [ -n "$(get_env $v)" ] || warn "Azure: в .env не заполнено $v — агенты не смогут думать"
   done
   [ -n "$(get_env AZURE_API_KEY)" ] && ok "Модель через Azure: $(get_env MODEL)"
+  if [ -n "$(get_env AZURE_OCR_ENDPOINT)" ]; then ok "OCR для фото и сканов: $(get_env OCR_MODEL)"
+  else case "$(get_env MODEL)" in *[Dd]eep[Ss]eek*) warn "DeepSeek не видит картинки, а OCR не подключён (AZURE_OCR_ENDPOINT) — текст с фото читаться не будет";; esac; fi
 else
   USE_AZURE=""
 fi

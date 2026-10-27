@@ -14,6 +14,12 @@ export const config = {
   azureKey: env.AZURE_API_KEY || '',
   azureApiVersion: env.AZURE_API_VERSION || '',
   model: env.MODEL || (llmProvider === 'azure' ? '' : 'z-ai/glm-5.3-flash'),
+  // Видит ли модель картинки. DeepSeek — нет: Azure молча выбрасывает изображение, и модель его «додумывает»
+  // OCR для фото и сканов (Mistral Document AI в Azure); ключ по умолчанию тот же, что у Azure
+  ocrEndpoint: (env.AZURE_OCR_ENDPOINT || '').trim(),
+  ocrKey: env.AZURE_OCR_KEY || env.AZURE_API_KEY || '',
+  ocrModel: env.OCR_MODEL || 'mistral-document-ai-2512',
+  vision: env.LLM_VISION ? !/^(0|false|no|нет)$/i.test(env.LLM_VISION.trim()) : !/deepseek/i.test(env.MODEL || ''),
   // без ADMIN_PASSWORD пароль генерируется при каждом запуске и печатается в лог
   adminPassword: env.ADMIN_PASSWORD || crypto.randomBytes(9).toString('base64url'),
   publicUrl: (env.PUBLIC_URL || `http://localhost:${env.PORT || 8080}`).replace(/\/$/, ''),

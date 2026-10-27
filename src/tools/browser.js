@@ -20,7 +20,7 @@ function webOnly(url) {
 }
 
 // Chromium запускается от root вместе с офисом — ключи из окружения ему не передаём
-const { OPENROUTER_API_KEY, AZURE_API_KEY, ADMIN_PASSWORD, AGENT_LINK_TOKEN, TELEGRAM_BOT_TOKEN, ...browserEnv } = process.env;
+const { OPENROUTER_API_KEY, AZURE_API_KEY, AZURE_OCR_KEY, ADMIN_PASSWORD, AGENT_LINK_TOKEN, TELEGRAM_BOT_TOKEN, ...browserEnv } = process.env;
 const pages = new Map(); // taskId -> page
 
 async function getBrowser() {

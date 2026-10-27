@@ -14,6 +14,7 @@ import { agentState, createTask, runTask, cancelTask, pauseTask, resumeTask, tal
 import { wsPath } from './tools/files.js';
 import { usageReport, watchBalance } from './billing.js';
 import { setSecret, deleteSecret, secretNames } from './secrets.js';
+import { ocrEnabled, ocrFile } from './ocr.js';
 
 const SESSION = crypto.createHash('sha256').update('algo:' + config.adminPassword).digest('hex');
 const authed = (token) => typeof token === 'string' && token.length === SESSION.length && crypto.timingSafeEqual(Buffer.from(token), Buffer.from(SESSION));
@@ -43,6 +44,14 @@ async function withFiles(text, files) {
   const full = `${text || 'Посмотри, что в файлах, и скажи, что с ними сделать.'}\n\n[Владелец прикрепил файлы: ${list.join(', ')}]`;
   const images = list.filter((f) => IMAGE.test(f)).slice(0, 4);
   if (!images.length) return { text: full, files: list };
+  // модель не видит картинки — передаём ей распознанный с них текст
+  if (!config.vision) {
+    if (!ocrEnabled()) return { text: full, files: list };
+    const parts = await Promise.all(images.map(async (f) => {
+      try { return `[Текст с картинки ${f} (распознан OCR):\n${(await ocrFile(wsPath(f))).slice(0, 8000)}]`; } catch (e) { return `[Картинку ${f} распознать не удалось: ${e.message}]`; }
+    }));
+    return { text: full, files: list, content: full + '\n\n' + parts.join('\n\n') }; // в чате — только текст владельца
+  }
   const parts = [{ type: 'text', text: full }];
   for (const f of images) {
     const b64 = (await fs.readFile(wsPath(f))).toString('base64');

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { wsPath } from './files.js';
 import { htmlToPdf, pdfFromFile } from './browser.js';
 import { sandboxSpawn } from '../sandbox.js';
+import { ocrEnabled, canOcr, ocrFile } from '../ocr.js';
 
 const HELPER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'doctool.py');
 
@@ -80,10 +81,15 @@ export const docTools = [
   },
   {
     name: 'read_document',
-    description: 'Прочитать документ из рабочей папки: PDF, DOCX, PPTX, XLSX или текст. Возвращает текст (у PDF — по страницам).',
+    description: 'Прочитать документ из рабочей папки: PDF, DOCX, PPTX, XLSX, текст, а также фото и сканы (PNG/JPG и т.п. — текст распознаётся OCR). Возвращает текст (у PDF — по страницам).',
     parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
     async run({ path: p }) {
-      const out = await py(['read', wsPath(p)]);
+      const full = wsPath(p);
+      const isPdf = /\.pdf$/i.test(full);
+      // картинка — сразу в OCR; PDF — сначала текстовый слой, а если это скан, тоже в OCR
+      if (canOcr(full) && !isPdf) return ocrEnabled() ? `[текст распознан OCR]\n${await ocrFile(full)}` : 'Это картинка, а OCR не настроен (AZURE_OCR_ENDPOINT в .env) — текст с неё не прочитать.';
+      let out = await py(['read', full]);
+      if (isPdf && ocrEnabled() && out.includes('[В PDF почти нет текста')) out = `[скан: текст распознан OCR]\n${await ocrFile(full)}`;
       return out.length > 25000 ? out.slice(0, 25000) + '\n…[обрезано, документ длинный — читай частями через run_code при необходимости]' : out || '(пусто)';
     },
   },
